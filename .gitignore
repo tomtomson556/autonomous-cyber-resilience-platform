@@ -233,3 +233,11 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+crash.log
+crash.*.log
