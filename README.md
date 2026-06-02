@@ -6,13 +6,13 @@ AI-assisted cyber resilience and backup security validation platform for hybrid 
 
 This project demonstrates an enterprise-style security validation workflow for cloud backup infrastructure using:
 
-* AWS S3
-* Python
-* boto3
-* IAM
-* S3 Object Lock
-* Encryption Validation
-* Security Automation
+- AWS S3
+- Python
+- boto3
+- IAM
+- S3 Object Lock
+- Encryption Validation
+- Security Automation
 
 The platform validates whether backup storage is configured according to modern cloud security best practices.
 
@@ -24,22 +24,22 @@ The platform validates whether backup storage is configured according to modern 
 
 Automated validation of:
 
-* Bucket Versioning
-* Server-side Encryption
-* Object Lock capability
-* Public Access Block configuration
+- Bucket Versioning
+- Server-side Encryption
+- Object Lock capability
+- Public Access Block configuration
 
 ### AWS Integration
 
-* IAM-based authentication
-* AWS CLI integration
-* boto3 SDK automation
+- IAM-based authentication
+- AWS CLI integration
+- boto3 SDK automation
 
 ### Security Controls
 
-* Immutable-storage-ready configuration
-* Encrypted object storage
-* Public exposure prevention
+- Immutable-storage-ready configuration
+- Encrypted object storage
+- Public exposure prevention
 
 ### Infrastructure as Code with Terraform
 
@@ -60,14 +60,14 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 
 ## Technologies
 
-* Python 3
-* AWS S3
-* boto3
-* Git
-* GitHub
-* AWS CLI
-* Terraform
-* Infrastructure as Code
+- Python 3
+- AWS S3
+- boto3
+- Git
+- GitHub
+- AWS CLI
+- Terraform
+- Infrastructure as Code
 
 ---
 
@@ -83,9 +83,6 @@ Public Access Block: PASS
 
 Overall Status: SECURE
 ```
-
----
-
 
 ---
 
@@ -141,12 +138,11 @@ State files are intentionally excluded from GitHub via `.gitignore`.
 
 ## Future Roadmap
 
-* Veeam API integration
-* AI-based anomaly detection
-* Local LLM integration with Ollama
-* CrewAI multi-agent orchestration
-* Terraform infrastructure deployment
-* Incident response automation
+- Veeam API integration
+- AI-based anomaly detection
+- Local LLM integration with Ollama
+- CrewAI multi-agent orchestration
+- Incident response automation
 
 ---
 
