@@ -41,6 +41,21 @@ Automated validation of:
 * Encrypted object storage
 * Public exposure prevention
 
+### Infrastructure as Code with Terraform
+
+The project includes Terraform-based infrastructure deployment for the S3 lab environment.
+
+Terraform provisions:
+
+- S3 bucket
+- Bucket versioning
+- Server-side encryption
+- Public access blocking
+- Resource tagging
+- Terraform outputs for bucket name, ARN, and region
+
+This demonstrates reproducible infrastructure deployment and cloud security automation using Infrastructure as Code.
+
 ---
 
 ## Technologies
@@ -51,6 +66,8 @@ Automated validation of:
 * Git
 * GitHub
 * AWS CLI
+* Terraform
+* Infrastructure as Code
 
 ---
 
@@ -66,6 +83,59 @@ Public Access Block: PASS
 
 Overall Status: SECURE
 ```
+
+---
+
+
+---
+
+## Terraform Deployment
+
+Terraform configuration is located in:
+
+```text
+infrastructure/terraform/
+```
+
+Before running Terraform commands, switch into the Terraform directory:
+
+```bash
+cd infrastructure/terraform
+```
+
+### Validate configuration
+
+```bash
+terraform validate
+```
+
+### Preview infrastructure changes
+
+```bash
+terraform plan
+```
+
+### Deploy infrastructure
+
+```bash
+terraform apply
+```
+
+### Show outputs
+
+```bash
+terraform output
+```
+
+Example outputs:
+
+```text
+bucket_name   = "cyber-resilience-terraform-lab-tom-2026"
+bucket_arn    = "arn:aws:s3:::cyber-resilience-terraform-lab-tom-2026"
+bucket_region = "eu-central-1"
+```
+
+State files are intentionally excluded from GitHub via `.gitignore`.
 
 ---
 
