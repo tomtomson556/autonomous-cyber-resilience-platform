@@ -13,8 +13,27 @@ This project demonstrates an enterprise-style security validation workflow for c
 - S3 Object Lock
 - Encryption Validation
 - Security Automation
+- Terraform
 
 The platform validates whether backup storage is configured according to modern cloud security best practices.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Python Security Validator] --> B[boto3 AWS SDK]
+    B --> C[AWS S3 Backup Lab Bucket]
+
+    C --> D[Bucket Versioning]
+    C --> E[Server-side Encryption]
+    C --> F[Object Lock Capability]
+    C --> G[Public Access Block]
+
+    H[Terraform Infrastructure as Code] --> C
+    I[IAM Least Privilege Users] --> B
+```
 
 ---
 
@@ -40,6 +59,7 @@ Automated validation of:
 - Immutable-storage-ready configuration
 - Encrypted object storage
 - Public exposure prevention
+- Least-privilege IAM access
 
 ### Infrastructure as Code with Terraform
 
@@ -63,10 +83,11 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 - Python 3
 - AWS S3
 - boto3
-- Git
-- GitHub
+- IAM
 - AWS CLI
 - Terraform
+- Git
+- GitHub
 - Infrastructure as Code
 
 ---
@@ -76,6 +97,8 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 ```text
 S3 Security Validation Report
 ============================
+Bucket: cyber-resilience-backup-lab-tom-2026
+
 Versioning: PASS
 Encryption: PASS
 Object Lock: PASS
@@ -136,6 +159,21 @@ State files are intentionally excluded from GitHub via `.gitignore`.
 
 ---
 
+## Security Notes
+
+This project follows core cloud security principles:
+
+- No root-account access for daily operations
+- MFA enabled for administrative access
+- Dedicated IAM users for separate responsibilities
+- Least-privilege IAM policy for the security validator
+- Separate Terraform deployer identity for infrastructure deployment
+- Environment variables are excluded from GitHub
+- Terraform state files are excluded from GitHub
+- Public S3 access is blocked by default
+
+---
+
 ## Future Roadmap
 
 - Veeam API integration
@@ -143,6 +181,8 @@ State files are intentionally excluded from GitHub via `.gitignore`.
 - Local LLM integration with Ollama
 - CrewAI multi-agent orchestration
 - Incident response automation
+- JSON security reports
+- GitHub Actions workflow with OIDC-based AWS authentication
 
 ---
 
