@@ -1,10 +1,14 @@
+import json
 import os
+from datetime import datetime, timezone
+
 import boto3
 from dotenv import load_dotenv
 
 load_dotenv()
 
 BUCKET_NAME = os.getenv("BUCKET_NAME")
+REPORT_PATH = "reports/s3_security_report.json"
 
 s3 = boto3.client(
     "s3",
@@ -51,21 +55,50 @@ def check_public_access_block():
         return False
 
 
-checks = {
-    "Versioning": check_versioning(),
-    "Encryption": check_encryption(),
-    "Object Lock": check_object_lock(),
-    "Public Access Block": check_public_access_block(),
-}
+def build_report():
+    checks = {
+        "versioning": check_versioning(),
+        "encryption": check_encryption(),
+        "object_lock": check_object_lock(),
+        "public_access_block": check_public_access_block(),
+    }
 
-print("\nS3 Security Validation Report")
-print("============================")
-print(f"Bucket: {BUCKET_NAME}\n")
+    overall_status = "SECURE" if all(checks.values()) else "NOT_SECURE"
 
-for check_name, passed in checks.items():
-    status = "PASS" if passed else "FAIL"
-    print(f"{check_name}: {status}")
+    report = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "bucket": BUCKET_NAME,
+        "checks": {
+            check_name: "PASS" if passed else "FAIL"
+            for check_name, passed in checks.items()
+        },
+        "overall_status": overall_status,
+    }
 
-overall_status = "SECURE" if all(checks.values()) else "NOT SECURE"
+    return report
 
-print("\nOverall Status:", overall_status)
+
+def print_report(report):
+    print("\nS3 Security Validation Report")
+    print("============================")
+    print(f"Bucket: {report['bucket']}\n")
+
+    for check_name, status in report["checks"].items():
+        print(f"{check_name}: {status}")
+
+    print("\nOverall Status:", report["overall_status"])
+
+
+def save_report(report):
+    os.makedirs("reports", exist_ok=True)
+
+    with open(REPORT_PATH, "w", encoding="utf-8") as file:
+        json.dump(report, file, indent=2)
+
+    print(f"\nJSON report written to: {REPORT_PATH}")
+
+
+if __name__ == "__main__":
+    security_report = build_report()
+    print_report(security_report)
+    save_report(security_report)

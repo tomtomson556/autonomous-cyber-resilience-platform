@@ -241,3 +241,6 @@ __pycache__/
 *.tfvars
 crash.log
 crash.*.log
+
+# Generated Reports
+reports/
