@@ -38,7 +38,7 @@ jobs:
       - name: Compile Python files
         run: |
           python -m compileall src
-      
+
       - name: Run unit tests
         run: |
           pytest
