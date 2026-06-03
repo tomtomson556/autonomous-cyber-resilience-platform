@@ -18,13 +18,6 @@ REQUIRED_ENV_VARS = [
     "BUCKET_NAME",
 ]
 
-s3 = boto3.client(
-    "s3",
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    region_name=os.getenv("AWS_DEFAULT_REGION"),
-)
-
 
 def validate_environment():
     missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
@@ -34,31 +27,40 @@ def validate_environment():
         raise EnvironmentError(f"Missing required environment variable(s): {missing}")
 
 
-def check_versioning():
-    response = s3.get_bucket_versioning(Bucket=BUCKET_NAME)
+def create_s3_client():
+    return boto3.client(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_DEFAULT_REGION"),
+    )
+
+
+def check_versioning(s3_client):
+    response = s3_client.get_bucket_versioning(Bucket=BUCKET_NAME)
     return response.get("Status") == "Enabled"
 
 
-def check_encryption():
+def check_encryption(s3_client):
     try:
-        response = s3.get_bucket_encryption(Bucket=BUCKET_NAME)
+        response = s3_client.get_bucket_encryption(Bucket=BUCKET_NAME)
         rules = response.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
         return len(rules) > 0
     except Exception:
         return False
 
 
-def check_object_lock():
+def check_object_lock(s3_client):
     try:
-        response = s3.get_object_lock_configuration(Bucket=BUCKET_NAME)
+        response = s3_client.get_object_lock_configuration(Bucket=BUCKET_NAME)
         return "ObjectLockConfiguration" in response
     except Exception:
         return False
 
 
-def check_public_access_block():
+def check_public_access_block(s3_client):
     try:
-        response = s3.get_public_access_block(Bucket=BUCKET_NAME)
+        response = s3_client.get_public_access_block(Bucket=BUCKET_NAME)
         config = response.get("PublicAccessBlockConfiguration", {})
         required = [
             "BlockPublicAcls",
@@ -71,12 +73,12 @@ def check_public_access_block():
         return False
 
 
-def build_report():
+def build_report(s3_client):
     checks = {
-        "versioning": check_versioning(),
-        "encryption": check_encryption(),
-        "object_lock": check_object_lock(),
-        "public_access_block": check_public_access_block(),
+        "versioning": check_versioning(s3_client),
+        "encryption": check_encryption(s3_client),
+        "object_lock": check_object_lock(s3_client),
+        "public_access_block": check_public_access_block(s3_client),
     }
 
     overall_status = "SECURE" if all(checks.values()) else "NOT_SECURE"
@@ -117,7 +119,8 @@ def save_report(report):
 def main():
     try:
         validate_environment()
-        security_report = build_report()
+        s3_client = create_s3_client()
+        security_report = build_report(s3_client)
         print_report(security_report)
         save_report(security_report)
 
