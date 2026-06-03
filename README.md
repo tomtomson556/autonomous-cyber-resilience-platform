@@ -92,6 +92,50 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 
 ---
 
+## Local Setup
+
+Clone the repository:
+
+```bash
+git clone https://github.com/tomtomson556/autonomous-cyber-resilience-platform.git
+cd autonomous-cyber-resilience-platform
+```
+
+Create and activate a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Then configure your local `.env` file:
+
+```text
+AWS_ACCESS_KEY_ID=your_access_key_here
+AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
+AWS_DEFAULT_REGION=eu-central-1
+BUCKET_NAME=your_s3_bucket_name_here
+```
+
+Run the S3 security validator:
+
+```bash
+python src/tools/aws_s3_security.py
+```
+---
+
 ## Example Validation Output
 
 ```text
