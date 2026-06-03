@@ -94,6 +94,30 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 
 ---
 
+## Project Structure
+
+```text
+.
+├── .github/workflows/              # GitHub Actions CI pipeline
+├── docs/                           # Documentation and example reports
+├── infrastructure/terraform/       # Terraform infrastructure definitions
+├── reports/                        # Local generated reports, ignored by Git
+├── src/tools/                      # Python security validation tools
+├── .env.example                    # Example environment configuration
+├── .gitignore                      # Excludes secrets, state files, and runtime artifacts
+├── README.md                       # Project documentation
+└── requirements.txt                # Python dependencies
+```
+
+Key components:
+
+- `src/tools/aws_s3_security.py` runs the S3 security validation.
+- `infrastructure/terraform/` defines the S3 lab infrastructure as code.
+- `docs/example_s3_security_report.json` shows a safe example output.
+- `reports/` stores local runtime reports and is intentionally excluded from GitHub.
+
+---
+
 ## Local Setup
 
 Clone the repository:
