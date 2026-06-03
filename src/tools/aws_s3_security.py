@@ -10,6 +10,22 @@ load_dotenv()
 BUCKET_NAME = os.getenv("BUCKET_NAME")
 REPORT_PATH = "reports/s3_security_report.json"
 
+REQUIRED_ENV_VARS = [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_DEFAULT_REGION",
+    "BUCKET_NAME",
+]
+
+
+def validate_environment():
+    missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+
+    if missing_vars:
+        missing = ", ".join(missing_vars)
+        raise EnvironmentError(f"Missing required environment variable(s): {missing}")
+
+
 s3 = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
@@ -99,6 +115,7 @@ def save_report(report):
 
 
 if __name__ == "__main__":
+    validate_environment()
     security_report = build_report()
     print_report(security_report)
     save_report(security_report)
