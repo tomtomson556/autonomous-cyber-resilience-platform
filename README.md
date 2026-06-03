@@ -1,5 +1,7 @@
 # Autonomous Cyber-Resilience Platform
 
+![CI](https://github.com/tomtomson556/autonomous-cyber-resilience-platform/actions/workflows/ci.yml/badge.svg)
+
 AI-assisted cyber resilience and backup security validation platform for hybrid cloud environments.
 
 ## Overview
