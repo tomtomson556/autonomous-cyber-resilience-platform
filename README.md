@@ -182,6 +182,28 @@ The project also includes a GitHub Actions CI workflow that automatically valida
 
 ---
 
+## Dependency Governance
+
+This project uses Dependabot to keep dependencies up to date across Python packages, GitHub Actions, and Terraform providers.
+
+Automated dependency updates are configured for:
+
+- Python dependencies via `pip`
+- GitHub Actions
+- Terraform providers
+
+AWS SDK related Python packages are grouped into a single Dependabot update group:
+
+- `boto3`
+- `botocore`
+- `s3transfer`
+
+Terraform AWS provider major version updates are intentionally ignored by Dependabot. Major provider upgrades can introduce breaking changes and should be tested separately with `terraform plan` before being merged.
+
+This keeps routine patch and minor updates automated while maintaining controlled governance for infrastructure-critical major upgrades.
+
+---
+
 ## Example Validation Output
 
 ```text
