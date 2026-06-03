@@ -12,6 +12,7 @@ pytest==9.0.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 requests==2.34.2
+ruff==0.15.15
 s3transfer==0.18.0
 six==1.17.0
 urllib3==2.7.0
