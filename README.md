@@ -91,6 +91,8 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 - Git
 - GitHub
 - Infrastructure as Code
+- pytest
+- GitHub Actions
 
 ---
 
@@ -160,6 +162,24 @@ Run the S3 security validator:
 ```bash
 python src/tools/aws_s3_security.py
 ```
+---
+
+## Testing
+
+Run the unit tests locally:
+
+```bash
+pytest
+```
+
+The project also includes a GitHub Actions CI workflow that automatically validates:
+
+- Python dependency installation
+- Python syntax compilation
+- Unit tests
+- Terraform formatting
+- Terraform validation
+
 ---
 
 ## Example Validation Output
