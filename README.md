@@ -106,6 +106,41 @@ Public Access Block: PASS
 
 Overall Status: SECURE
 ```
+---
+
+## Security Report Output
+
+The validator also generates a machine-readable JSON report for downstream automation, documentation, or future incident-response workflows.
+
+Generated reports are written locally to:
+
+```text
+reports/s3_security_report.json
+```
+
+Runtime reports are excluded from GitHub via `.gitignore`.
+
+A safe example report is included here:
+
+```text
+docs/example_s3_security_report.json
+```
+
+Example JSON report:
+
+```json
+{
+  "timestamp": "2026-06-03T10:00:00+00:00",
+  "bucket": "cyber-resilience-backup-lab-example",
+  "checks": {
+    "versioning": "PASS",
+    "encryption": "PASS",
+    "object_lock": "PASS",
+    "public_access_block": "PASS"
+  },
+  "overall_status": "SECURE"
+}
+```
 
 ---
 
