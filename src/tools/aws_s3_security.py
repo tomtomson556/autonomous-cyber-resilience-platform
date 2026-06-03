@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from datetime import datetime, timezone
 
 import boto3
@@ -17,6 +18,13 @@ REQUIRED_ENV_VARS = [
     "BUCKET_NAME",
 ]
 
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    region_name=os.getenv("AWS_DEFAULT_REGION"),
+)
+
 
 def validate_environment():
     missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
@@ -24,14 +32,6 @@ def validate_environment():
     if missing_vars:
         missing = ", ".join(missing_vars)
         raise EnvironmentError(f"Missing required environment variable(s): {missing}")
-
-
-s3 = boto3.client(
-    "s3",
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    region_name=os.getenv("AWS_DEFAULT_REGION"),
-)
 
 
 def check_versioning():
@@ -114,8 +114,22 @@ def save_report(report):
     print(f"\nJSON report written to: {REPORT_PATH}")
 
 
+def main():
+    try:
+        validate_environment()
+        security_report = build_report()
+        print_report(security_report)
+        save_report(security_report)
+
+        if security_report["overall_status"] == "SECURE":
+            return 0
+
+        return 1
+
+    except Exception as error:
+        print(f"\nSecurity validation failed: {error}")
+        return 2
+
+
 if __name__ == "__main__":
-    validate_environment()
-    security_report = build_report()
-    print_report(security_report)
-    save_report(security_report)
+    sys.exit(main())
