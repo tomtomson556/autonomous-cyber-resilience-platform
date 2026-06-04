@@ -278,7 +278,10 @@ Example JSON report:
     "versioning": "PASS",
     "encryption": "PASS",
     "object_lock": "PASS",
-    "public_access_block": "PASS"
+    "public_access_block": "PASS",
+    "bucket_policy_not_public": "PASS",
+    "secure_transport_policy": "PASS",
+    "bucket_owner_enforced": "PASS"
   },
   "overall_status": "SECURE"
 }
@@ -363,6 +366,8 @@ bucket_region = "eu-central-1"
 ```
 
 State files and local variable files are intentionally excluded from GitHub via `.gitignore`.
+
+> Note: The Terraform lab configuration currently provisions versioning, encryption, public access blocking, TLS-only access, and bucket-owner-enforced object ownership. S3 Object Lock is validated by the Python security validator but is not enabled by this Terraform configuration because enabling Object Lock on an existing bucket can require replacement or irreversible configuration changes. A Terraform-only lab bucket may therefore not produce a fully `SECURE` validator report until Object Lock is configured separately.
 
 ---
 
