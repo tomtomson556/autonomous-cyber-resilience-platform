@@ -162,6 +162,7 @@ Run the S3 security validator:
 ```bash
 python src/tools/aws_s3_security.py
 ```
+
 ---
 
 ## Testing
@@ -171,6 +172,17 @@ Run the unit tests locally:
 ```bash
 pytest
 ```
+
+The test suite includes unit tests for:
+
+- S3 bucket name validation
+- Bucket versioning checks
+- Server-side encryption checks
+- Object Lock checks
+- Public Access Block checks
+- JSON report structure
+
+AWS API behavior is tested with mocked boto3 clients, so unit tests do not require live AWS access.
 
 The project also includes a GitHub Actions CI workflow that automatically validates:
 
@@ -218,6 +230,7 @@ Public Access Block: PASS
 
 Overall Status: SECURE
 ```
+
 ---
 
 ## Security Report Output
