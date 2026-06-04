@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "cyber_resilience_lab" {
-  bucket = "cyber-resilience-terraform-lab-tom-2026"
+  bucket = var.bucket_name
 
   tags = {
     Project     = "CyberResiliencePlatform"
