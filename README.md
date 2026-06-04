@@ -151,10 +151,17 @@ cp .env.example .env
 Then configure your local `.env` file:
 
 ```text
-AWS_ACCESS_KEY_ID=your_access_key_here
-AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
 AWS_DEFAULT_REGION=eu-central-1
 BUCKET_NAME=your_s3_bucket_name_here
+```
+
+AWS credentials are resolved through the AWS default credential provider chain. For local lab usage, credentials can be provided through environment variables, an AWS CLI profile, or another supported boto3 credential source.
+
+When using environment variables locally, the following values may be set outside Git:
+
+```text
+AWS_ACCESS_KEY_ID=your_access_key_here
+AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
 ```
 
 Run the S3 security validator:
@@ -358,6 +365,8 @@ This project follows core cloud security principles:
 - Dedicated IAM users for separate responsibilities
 - Least-privilege IAM policy for the security validator
 - Separate Terraform deployer identity for infrastructure deployment
+- AWS credentials are resolved through the AWS default credential provider chain
+- The validator targets configured buckets directly and does not require account-wide S3 bucket listing
 - Environment variables are excluded from GitHub
 - Terraform state files are excluded from GitHub
 - Public S3 access is blocked by default
