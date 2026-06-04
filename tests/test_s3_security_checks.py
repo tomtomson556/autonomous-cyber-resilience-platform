@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
+
 from src.tools.aws_s3_security import (
     check_encryption,
     check_object_lock,
@@ -10,6 +11,8 @@ from src.tools.aws_s3_security import (
     check_versioning,
     validate_bucket_name,
 )
+
+TEST_BUCKET = "valid-security-bucket-123"
 
 
 def make_client_error(error_code: str, operation_name: str) -> ClientError:
@@ -44,14 +47,14 @@ def test_check_versioning_enabled():
     mock_client = MagicMock()
     mock_client.get_bucket_versioning.return_value = {"Status": "Enabled"}
 
-    assert check_versioning(mock_client) is True
+    assert check_versioning(mock_client, TEST_BUCKET) is True
 
 
 def test_check_versioning_suspended():
     mock_client = MagicMock()
     mock_client.get_bucket_versioning.return_value = {"Status": "Suspended"}
 
-    assert check_versioning(mock_client) is False
+    assert check_versioning(mock_client, TEST_BUCKET) is False
 
 
 def test_check_encryption_configured():
@@ -68,7 +71,7 @@ def test_check_encryption_configured():
         }
     }
 
-    assert check_encryption(mock_client) is True
+    assert check_encryption(mock_client, TEST_BUCKET) is True
 
 
 def test_check_encryption_not_configured():
@@ -78,7 +81,7 @@ def test_check_encryption_not_configured():
         "GetBucketEncryption",
     )
 
-    assert check_encryption(mock_client) is False
+    assert check_encryption(mock_client, TEST_BUCKET) is False
 
 
 def test_check_object_lock_configured():
@@ -89,7 +92,7 @@ def test_check_object_lock_configured():
         }
     }
 
-    assert check_object_lock(mock_client) is True
+    assert check_object_lock(mock_client, TEST_BUCKET) is True
 
 
 def test_check_object_lock_not_configured():
@@ -99,7 +102,7 @@ def test_check_object_lock_not_configured():
         "GetObjectLockConfiguration",
     )
 
-    assert check_object_lock(mock_client) is False
+    assert check_object_lock(mock_client, TEST_BUCKET) is False
 
 
 def test_check_public_access_block_fully_enabled():
@@ -113,7 +116,7 @@ def test_check_public_access_block_fully_enabled():
         }
     }
 
-    assert check_public_access_block(mock_client) is True
+    assert check_public_access_block(mock_client, TEST_BUCKET) is True
 
 
 def test_check_public_access_block_missing():
@@ -123,4 +126,4 @@ def test_check_public_access_block_missing():
         "GetPublicAccessBlock",
     )
 
-    assert check_public_access_block(mock_client) is False
+    assert check_public_access_block(mock_client, TEST_BUCKET) is False

@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BUCKET_NAME = os.getenv("BUCKET_NAME")
 AWS_REGION = os.getenv("AWS_DEFAULT_REGION")
 REPORT_PATH = Path("reports/s3_security_report.json")
 
@@ -48,17 +47,26 @@ def validate_bucket_name(bucket_name: str) -> None:
         raise ValueError("Invalid S3 bucket name: bucket name must not look like IP.")
 
 
-def validate_environment() -> None:
+def get_required_env_var(name: str) -> str:
+    value = os.getenv(name)
+
+    if not value:
+        raise EnvironmentError(f"Missing required environment variable: {name}")
+
+    return value
+
+
+def validate_environment() -> str:
     missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
 
     if missing_vars:
         missing = ", ".join(missing_vars)
         raise EnvironmentError(f"Missing required environment variable(s): {missing}")
 
-    if BUCKET_NAME is None:
-        raise EnvironmentError("Missing required environment variable: BUCKET_NAME")
+    bucket_name = get_required_env_var("BUCKET_NAME")
+    validate_bucket_name(bucket_name)
 
-    validate_bucket_name(BUCKET_NAME)
+    return bucket_name
 
 
 def create_s3_client():
@@ -93,9 +101,9 @@ def raise_for_critical_s3_error(error: ClientError, check_name: str) -> None:
         ) from error
 
 
-def check_versioning(s3_client) -> bool:
+def check_versioning(s3_client, bucket_name: str) -> bool:
     try:
-        response = s3_client.get_bucket_versioning(Bucket=BUCKET_NAME)
+        response = s3_client.get_bucket_versioning(Bucket=bucket_name)
         return response.get("Status") == "Enabled"
     except ClientError as error:
         raise_for_critical_s3_error(error, "versioning")
@@ -106,9 +114,9 @@ def check_versioning(s3_client) -> bool:
         return False
 
 
-def check_encryption(s3_client) -> bool:
+def check_encryption(s3_client, bucket_name: str) -> bool:
     try:
-        response = s3_client.get_bucket_encryption(Bucket=BUCKET_NAME)
+        response = s3_client.get_bucket_encryption(Bucket=bucket_name)
         rules = response.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
         return len(rules) > 0
     except ClientError as error:
@@ -122,9 +130,9 @@ def check_encryption(s3_client) -> bool:
         return False
 
 
-def check_object_lock(s3_client) -> bool:
+def check_object_lock(s3_client, bucket_name: str) -> bool:
     try:
-        response = s3_client.get_object_lock_configuration(Bucket=BUCKET_NAME)
+        response = s3_client.get_object_lock_configuration(Bucket=bucket_name)
         return "ObjectLockConfiguration" in response
     except ClientError as error:
         error_code = get_client_error_code(error)
@@ -137,9 +145,9 @@ def check_object_lock(s3_client) -> bool:
         return False
 
 
-def check_public_access_block(s3_client) -> bool:
+def check_public_access_block(s3_client, bucket_name: str) -> bool:
     try:
-        response = s3_client.get_public_access_block(Bucket=BUCKET_NAME)
+        response = s3_client.get_public_access_block(Bucket=bucket_name)
         config = response.get("PublicAccessBlockConfiguration", {})
         required_settings = [
             "BlockPublicAcls",
@@ -162,19 +170,19 @@ def check_public_access_block(s3_client) -> bool:
         return False
 
 
-def build_report(s3_client) -> dict:
+def build_report(s3_client, bucket_name: str) -> dict:
     checks = {
-        "versioning": check_versioning(s3_client),
-        "encryption": check_encryption(s3_client),
-        "object_lock": check_object_lock(s3_client),
-        "public_access_block": check_public_access_block(s3_client),
+        "versioning": check_versioning(s3_client, bucket_name),
+        "encryption": check_encryption(s3_client, bucket_name),
+        "object_lock": check_object_lock(s3_client, bucket_name),
+        "public_access_block": check_public_access_block(s3_client, bucket_name),
     }
 
     overall_status = "SECURE" if all(checks.values()) else "NOT_SECURE"
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "bucket": BUCKET_NAME,
+        "bucket": bucket_name,
         "checks": {
             check_name: "PASS" if passed else "FAIL"
             for check_name, passed in checks.items()
@@ -207,9 +215,9 @@ def main() -> int:
     configure_logging()
 
     try:
-        validate_environment()
+        bucket_name = validate_environment()
         s3_client = create_s3_client()
-        security_report = build_report(s3_client)
+        security_report = build_report(s3_client, bucket_name)
         print_report(security_report)
         save_report(security_report)
 
