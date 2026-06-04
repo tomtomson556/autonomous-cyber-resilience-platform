@@ -5,7 +5,10 @@
     "versioning": "PASS",
     "encryption": "PASS",
     "object_lock": "PASS",
-    "public_access_block": "PASS"
+    "public_access_block": "PASS",
+    "bucket_policy_not_public": "PASS",
+    "secure_transport_policy": "PASS",
+    "bucket_owner_enforced": "PASS"
   },
   "overall_status": "SECURE"
 }
