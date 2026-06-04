@@ -49,6 +49,9 @@ Automated validation of:
 - Server-side Encryption
 - Object Lock capability
 - Public Access Block configuration
+- Bucket policy public exposure status
+- TLS-only bucket policy enforcement
+- S3 Object Ownership with ACLs disabled
 
 ### AWS Integration
 
@@ -61,6 +64,8 @@ Automated validation of:
 - Immutable-storage-ready configuration
 - Encrypted object storage
 - Public exposure prevention
+- TLS-only data access
+- ACL-free bucket ownership enforcement
 - Least-privilege IAM access
 
 ### Infrastructure as Code with Terraform
@@ -73,6 +78,8 @@ Terraform provisions:
 - Bucket versioning
 - Server-side encryption
 - Public access blocking
+- Bucket owner enforced object ownership
+- TLS-only bucket policy
 - Resource tagging
 - Terraform outputs for bucket name, ARN, and region
 
@@ -234,6 +241,9 @@ Versioning: PASS
 Encryption: PASS
 Object Lock: PASS
 Public Access Block: PASS
+Bucket Policy Not Public: PASS
+Secure Transport Policy: PASS
+Bucket Owner Enforced: PASS
 
 Overall Status: SECURE
 ```

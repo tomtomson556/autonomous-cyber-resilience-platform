@@ -118,7 +118,13 @@ def check_encryption(s3_client, bucket_name: str) -> bool:
     try:
         response = s3_client.get_bucket_encryption(Bucket=bucket_name)
         rules = response.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
-        return len(rules) > 0
+        approved_algorithms = {"AES256", "aws:kms", "aws:kms:dsse"}
+
+        return any(
+            rule.get("ApplyServerSideEncryptionByDefault", {}).get("SSEAlgorithm")
+            in approved_algorithms
+            for rule in rules
+        )
     except ClientError as error:
         error_code = get_client_error_code(error)
 
@@ -133,7 +139,8 @@ def check_encryption(s3_client, bucket_name: str) -> bool:
 def check_object_lock(s3_client, bucket_name: str) -> bool:
     try:
         response = s3_client.get_object_lock_configuration(Bucket=bucket_name)
-        return "ObjectLockConfiguration" in response
+        configuration = response.get("ObjectLockConfiguration", {})
+        return configuration.get("ObjectLockEnabled") == "Enabled"
     except ClientError as error:
         error_code = get_client_error_code(error)
 
@@ -170,12 +177,168 @@ def check_public_access_block(s3_client, bucket_name: str) -> bool:
         return False
 
 
+def check_bucket_policy_not_public(s3_client, bucket_name: str) -> bool:
+    try:
+        response = s3_client.get_bucket_policy_status(Bucket=bucket_name)
+        return response.get("PolicyStatus", {}).get("IsPublic") is False
+    except ClientError as error:
+        error_code = get_client_error_code(error)
+
+        if error_code == "NoSuchBucketPolicy":
+            return True
+
+        if error_code == "AccessDenied":
+            LOGGER.warning(
+                "Bucket policy status check could not be completed due to AccessDenied."
+            )
+            return False
+
+        raise_for_critical_s3_error(error, "bucket_policy_not_public")
+        LOGGER.warning(
+            "Bucket policy status check failed with AWS error: %s", error_code
+        )
+        return False
+
+
+def _as_list(value):
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return value
+
+    return [value]
+
+
+def _condition_has_secure_transport_false(condition: dict) -> bool:
+    bool_conditions = {}
+
+    for operator, condition_values in condition.items():
+        if operator.lower() != "bool" or not isinstance(condition_values, dict):
+            continue
+
+        bool_conditions.update(condition_values)
+
+    secure_transport = bool_conditions.get("aws:SecureTransport")
+
+    if isinstance(secure_transport, bool):
+        return secure_transport is False
+
+    if isinstance(secure_transport, str):
+        return secure_transport.lower() == "false"
+
+    return False
+
+
+def _action_covers_s3(action) -> bool:
+    return any(item in {"s3:*", "*"} for item in _as_list(action))
+
+
+def _resource_covers_bucket(resource, bucket_name: str) -> bool:
+    bucket_arn = f"arn:aws:s3:::{bucket_name}"
+    object_arn = f"{bucket_arn}/*"
+    resources = set(_as_list(resource))
+
+    return {bucket_arn, object_arn}.issubset(resources) or "*" in resources
+
+
+def _principal_covers_everyone(principal) -> bool:
+    if principal == "*":
+        return True
+
+    if isinstance(principal, dict):
+        aws_principals = principal.get("AWS")
+        return "*" in _as_list(aws_principals)
+
+    return False
+
+
+def check_secure_transport_policy(s3_client, bucket_name: str) -> bool:
+    try:
+        response = s3_client.get_bucket_policy(Bucket=bucket_name)
+        policy = json.loads(response.get("Policy", "{}"))
+    except ClientError as error:
+        error_code = get_client_error_code(error)
+
+        if error_code == "NoSuchBucketPolicy":
+            return False
+
+        if error_code == "AccessDenied":
+            LOGGER.warning(
+                "Secure transport policy check could not be completed due to AccessDenied."
+            )
+            return False
+
+        raise_for_critical_s3_error(error, "secure_transport_policy")
+        LOGGER.warning("Bucket policy check failed with AWS error: %s", error_code)
+        return False
+    except json.JSONDecodeError:
+        LOGGER.warning(
+            "Bucket policy check failed because the policy is not valid JSON."
+        )
+        return False
+
+    for statement in _as_list(policy.get("Statement")):
+        if not isinstance(statement, dict):
+            continue
+
+        if statement.get("Effect") != "Deny":
+            continue
+
+        if not _action_covers_s3(statement.get("Action")):
+            continue
+
+        if not _resource_covers_bucket(statement.get("Resource"), bucket_name):
+            continue
+
+        if not _principal_covers_everyone(statement.get("Principal")):
+            continue
+
+        if _condition_has_secure_transport_false(statement.get("Condition", {})):
+            return True
+
+    return False
+
+
+def check_bucket_owner_enforced(s3_client, bucket_name: str) -> bool:
+    try:
+        response = s3_client.get_bucket_ownership_controls(Bucket=bucket_name)
+        rules = response.get("OwnershipControls", {}).get("Rules", [])
+        return any(
+            rule.get("ObjectOwnership") == "BucketOwnerEnforced" for rule in rules
+        )
+    except ClientError as error:
+        error_code = get_client_error_code(error)
+
+        if error_code == "OwnershipControlsNotFoundError":
+            return False
+
+        if error_code == "AccessDenied":
+            LOGGER.warning(
+                "Bucket ownership controls check could not be completed due to AccessDenied."
+            )
+            return False
+
+        raise_for_critical_s3_error(error, "bucket_owner_enforced")
+        LOGGER.warning("Ownership controls check failed with AWS error: %s", error_code)
+        return False
+
+
 def build_report(s3_client, bucket_name: str) -> dict:
     checks = {
         "versioning": check_versioning(s3_client, bucket_name),
         "encryption": check_encryption(s3_client, bucket_name),
         "object_lock": check_object_lock(s3_client, bucket_name),
         "public_access_block": check_public_access_block(s3_client, bucket_name),
+        "bucket_policy_not_public": check_bucket_policy_not_public(
+            s3_client,
+            bucket_name,
+        ),
+        "secure_transport_policy": check_secure_transport_policy(
+            s3_client,
+            bucket_name,
+        ),
+        "bucket_owner_enforced": check_bucket_owner_enforced(s3_client, bucket_name),
     }
 
     overall_status = "SECURE" if all(checks.values()) else "NOT_SECURE"

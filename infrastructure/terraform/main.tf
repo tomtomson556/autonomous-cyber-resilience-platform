@@ -8,6 +8,14 @@ resource "aws_s3_bucket" "cyber_resilience_lab" {
   }
 }
 
+resource "aws_s3_bucket_ownership_controls" "ownership" {
+  bucket = aws_s3_bucket.cyber_resilience_lab.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 resource "aws_s3_bucket_versioning" "versioning" {
   bucket = aws_s3_bucket.cyber_resilience_lab.id
 
@@ -15,6 +23,7 @@ resource "aws_s3_bucket_versioning" "versioning" {
     status = "Enabled"
   }
 }
+
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "encryption" {
   bucket = aws_s3_bucket.cyber_resilience_lab.id
@@ -33,4 +42,40 @@ resource "aws_s3_bucket_public_access_block" "public_access" {
   ignore_public_acls      = true
   block_public_policy     = true
   restrict_public_buckets = true
+}
+
+data "aws_iam_policy_document" "deny_insecure_transport" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+
+    resources = [
+      aws_s3_bucket.cyber_resilience_lab.arn,
+      "${aws_s3_bucket.cyber_resilience_lab.arn}/*",
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:PrincipalIsAWSService"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "deny_insecure_transport" {
+  bucket = aws_s3_bucket.cyber_resilience_lab.id
+  policy = data.aws_iam_policy_document.deny_insecure_transport.json
 }

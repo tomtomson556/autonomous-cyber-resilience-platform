@@ -10,6 +10,9 @@ def test_report_contains_required_fields():
             "encryption": "PASS",
             "object_lock": "PASS",
             "public_access_block": "PASS",
+            "bucket_policy_not_public": "PASS",
+            "secure_transport_policy": "PASS",
+            "bucket_owner_enforced": "PASS",
         },
         "overall_status": "SECURE",
     }
@@ -29,6 +32,9 @@ def test_print_report_does_not_crash():
             "encryption": "PASS",
             "object_lock": "PASS",
             "public_access_block": "PASS",
+            "bucket_policy_not_public": "PASS",
+            "secure_transport_policy": "PASS",
+            "bucket_owner_enforced": "PASS",
         },
         "overall_status": "SECURE",
     }
