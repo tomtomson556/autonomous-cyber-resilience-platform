@@ -270,6 +270,24 @@ Before running Terraform commands, switch into the Terraform directory:
 cd infrastructure/terraform
 ```
 
+### Configure variables
+
+The Terraform-managed S3 bucket name is configured through a required variable.
+
+Create a local Terraform variables file from the example:
+
+```bash
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Then edit `terraform.tfvars` and set a globally unique S3 bucket name:
+
+```hcl
+bucket_name = "your-globally-unique-s3-bucket-name"
+```
+
+The local `terraform.tfvars` file is excluded from GitHub via `.gitignore` and should not be committed.
+
 ### Validate configuration
 
 ```bash
@@ -282,10 +300,22 @@ terraform validate
 terraform plan
 ```
 
+Alternatively, pass the bucket name explicitly without creating a local `terraform.tfvars` file:
+
+```bash
+terraform plan -var="bucket_name=your-globally-unique-s3-bucket-name"
+```
+
 ### Deploy infrastructure
 
 ```bash
 terraform apply
+```
+
+Alternatively, pass the bucket name explicitly during deployment:
+
+```bash
+terraform apply -var="bucket_name=your-globally-unique-s3-bucket-name"
 ```
 
 ### Show outputs
@@ -297,12 +327,12 @@ terraform output
 Example outputs:
 
 ```text
-bucket_name   = "cyber-resilience-terraform-lab-tom-2026"
-bucket_arn    = "arn:aws:s3:::cyber-resilience-terraform-lab-tom-2026"
+bucket_name   = "your-globally-unique-s3-bucket-name"
+bucket_arn    = "arn:aws:s3:::your-globally-unique-s3-bucket-name"
 bucket_region = "eu-central-1"
 ```
 
-State files are intentionally excluded from GitHub via `.gitignore`.
+State files and local variable files are intentionally excluded from GitHub via `.gitignore`.
 
 ---
 
