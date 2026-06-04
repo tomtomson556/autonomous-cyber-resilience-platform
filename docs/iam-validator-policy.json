@@ -1,0 +1,22 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ValidateSpecificS3BackupBuckets",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketVersioning",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetBucketObjectLockConfiguration",
+        "s3:GetPublicAccessBlock",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketPolicyStatus",
+        "s3:GetBucketOwnershipControls"
+      ],
+      "Resource": [
+        "arn:aws:s3:::cyber-resilience-backup-lab-tom-2026",
+        "arn:aws:s3:::cyber-resilience-terraform-lab-tom-2026"
+      ]
+    }
+  ]
+}
