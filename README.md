@@ -162,7 +162,9 @@ AWS_DEFAULT_REGION=eu-central-1
 BUCKET_NAME=your_s3_bucket_name_here
 ```
 
-AWS credentials are resolved through the AWS default credential provider chain. For local lab usage, credentials can be provided through environment variables, an AWS CLI profile, or another supported boto3 credential source.
+AWS credentials are resolved through the AWS default credential provider chain. For local lab usage,
+credentials can be provided through environment variables, an AWS CLI profile, or another supported
+boto3 credential source.
 
 When using environment variables locally, the following values may be set outside Git:
 
@@ -210,7 +212,8 @@ The project also includes a GitHub Actions CI workflow that automatically valida
 
 ## Dependency Governance
 
-This project uses Dependabot to keep dependencies up to date across Python packages, GitHub Actions, and Terraform providers.
+This project uses Dependabot to keep dependencies up to date across Python packages, GitHub Actions,
+and Terraform providers.
 
 Automated dependency updates are configured for:
 
@@ -224,9 +227,12 @@ AWS SDK related Python packages are grouped into a single Dependabot update grou
 - `botocore`
 - `s3transfer`
 
-Terraform AWS provider major version updates are intentionally ignored by Dependabot. Major provider upgrades can introduce breaking changes and should be tested separately with `terraform plan` before being merged.
+Terraform AWS provider major version updates are intentionally ignored by Dependabot. Major provider
+upgrades can introduce breaking changes and should be tested separately with `terraform plan` before
+being merged.
 
-This keeps routine patch and minor updates automated while maintaining controlled governance for infrastructure-critical major upgrades.
+This keeps routine patch and minor updates automated while maintaining controlled governance for
+infrastructure-critical major upgrades.
 
 ---
 
@@ -252,7 +258,8 @@ Overall Status: SECURE
 
 ## Security Report Output
 
-The validator also generates a machine-readable JSON report for downstream automation, documentation, or future incident-response workflows.
+The validator also generates a machine-readable JSON report for downstream automation,
+documentation, or future incident-response workflows.
 
 Generated reports are written locally to:
 
@@ -367,7 +374,12 @@ bucket_region = "eu-central-1"
 
 State files and local variable files are intentionally excluded from GitHub via `.gitignore`.
 
-> Note: The Terraform lab configuration currently provisions versioning, encryption, public access blocking, TLS-only access, and bucket-owner-enforced object ownership. S3 Object Lock is validated by the Python security validator but is not enabled by this Terraform configuration because enabling Object Lock on an existing bucket can require replacement or irreversible configuration changes. A Terraform-only lab bucket may therefore not produce a fully `SECURE` validator report until Object Lock is configured separately.
+> Note: The Terraform lab configuration currently provisions versioning, encryption, public access
+> blocking, TLS-only access, and bucket-owner-enforced object ownership. S3 Object Lock is validated
+> by the Python security validator but is not enabled by this Terraform configuration because
+> enabling Object Lock on an existing bucket can require replacement or irreversible configuration
+> changes. A Terraform-only lab bucket may therefore not produce a fully `SECURE` validator report
+> until Object Lock is configured separately.
 
 ---
 
