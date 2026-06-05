@@ -32,9 +32,12 @@ flowchart LR
     C --> E[Server-side Encryption]
     C --> F[Object Lock Capability]
     C --> G[Public Access Block]
+    C --> K[TLS-only Bucket Policy]
+    C --> L[Bucket Owner Enforced]
 
     H[Terraform Infrastructure as Code] --> C
     I[IAM Least Privilege Users] --> B
+    J[JSON Security Report] --> M[Local Reports Directory]
 ```
 
 ---
@@ -58,6 +61,7 @@ Automated validation of:
 - IAM-based authentication
 - AWS CLI integration
 - boto3 SDK automation
+- AWS default credential provider chain support
 
 ### Security Controls
 
@@ -67,6 +71,7 @@ Automated validation of:
 - TLS-only data access
 - ACL-free bucket ownership enforcement
 - Least-privilege IAM access
+- Machine-readable JSON security report output
 
 ### Infrastructure as Code with Terraform
 
@@ -78,6 +83,8 @@ Terraform provisions:
 - Bucket versioning
 - Server-side encryption
 - Public access blocking
+- S3 Object Lock enabled at bucket creation
+- Object Lock default retention in Governance mode
 - Bucket owner enforced object ownership
 - TLS-only bucket policy
 - Resource tagging
@@ -99,7 +106,9 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 - GitHub
 - Infrastructure as Code
 - pytest
+- Ruff
 - GitHub Actions
+- Dependabot
 
 ---
 
@@ -112,9 +121,12 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 ├── infrastructure/terraform/       # Terraform infrastructure definitions
 ├── reports/                        # Local generated reports, ignored by Git
 ├── src/tools/                      # Python security validation tools
+├── tests/                          # Unit tests with mocked AWS clients
 ├── .env.example                    # Example environment configuration
 ├── .gitignore                      # Excludes secrets, state files, and runtime artifacts
 ├── README.md                       # Project documentation
+├── SECURITY.md                     # Security policy
+├── pytest.ini                      # Pytest configuration
 └── requirements.txt                # Python dependencies
 ```
 
@@ -124,6 +136,7 @@ Key components:
 - `infrastructure/terraform/` defines the S3 lab infrastructure as code.
 - `docs/example_s3_security_report.json` shows a safe example output.
 - `reports/` stores local runtime reports and is intentionally excluded from GitHub.
+- `tests/` contains unit tests using mocked boto3 clients.
 
 ---
 
@@ -163,7 +176,7 @@ BUCKET_NAME=your_s3_bucket_name_here
 ```
 
 AWS credentials are resolved through the AWS default credential provider chain. For local lab usage,
-credentials can be provided through environment variables, an AWS CLI profile, or another supported
+credentials can be provided through environment variables, an AWS CLI profile, AWS SSO, or another supported
 boto3 credential source.
 
 When using environment variables locally, the following values may be set outside Git:
@@ -189,6 +202,12 @@ Run the unit tests locally:
 pytest
 ```
 
+Run Ruff linting locally:
+
+```bash
+ruff check src tests
+```
+
 The test suite includes unit tests for:
 
 - S3 bucket name validation
@@ -196,6 +215,9 @@ The test suite includes unit tests for:
 - Server-side encryption checks
 - Object Lock checks
 - Public Access Block checks
+- Bucket policy exposure checks
+- Secure transport policy checks
+- Bucket ownership enforcement checks
 - JSON report structure
 
 AWS API behavior is tested with mocked boto3 clients, so unit tests do not require live AWS access.
@@ -203,6 +225,7 @@ AWS API behavior is tested with mocked boto3 clients, so unit tests do not requi
 The project also includes a GitHub Actions CI workflow that automatically validates:
 
 - Python dependency installation
+- Ruff linting
 - Python syntax compilation
 - Unit tests
 - Terraform formatting
@@ -241,15 +264,15 @@ infrastructure-critical major upgrades.
 ```text
 S3 Security Validation Report
 ============================
-Bucket: cyber-resilience-backup-lab-tom-2026
+Bucket: cyber-resilience-objectlock-lab-tom-2026
 
-Versioning: PASS
-Encryption: PASS
-Object Lock: PASS
-Public Access Block: PASS
-Bucket Policy Not Public: PASS
-Secure Transport Policy: PASS
-Bucket Owner Enforced: PASS
+versioning: PASS
+encryption: PASS
+object_lock: PASS
+public_access_block: PASS
+bucket_policy_not_public: PASS
+secure_transport_policy: PASS
+bucket_owner_enforced: PASS
 
 Overall Status: SECURE
 ```
@@ -367,19 +390,14 @@ terraform output
 Example outputs:
 
 ```text
-bucket_name   = "your-globally-unique-s3-bucket-name"
-bucket_arn    = "arn:aws:s3:::your-globally-unique-s3-bucket-name"
+bucket_name   = "cyber-resilience-objectlock-lab-tom-2026"
+bucket_arn    = "arn:aws:s3:::cyber-resilience-objectlock-lab-tom-2026"
 bucket_region = "eu-central-1"
 ```
 
 State files and local variable files are intentionally excluded from GitHub via `.gitignore`.
 
-> Note: The Terraform lab configuration currently provisions versioning, encryption, public access
-> blocking, TLS-only access, and bucket-owner-enforced object ownership. S3 Object Lock is validated
-> by the Python security validator but is not enabled by this Terraform configuration because
-> enabling Object Lock on an existing bucket can require replacement or irreversible configuration
-> changes. A Terraform-only lab bucket may therefore not produce a fully `SECURE` validator report
-> until Object Lock is configured separately.
+The Terraform-managed lab bucket is created with Object Lock enabled at bucket creation time. The default retention configuration uses Governance mode with a 1-day retention period for safe lab testing.
 
 ---
 
@@ -394,8 +412,13 @@ This project follows core cloud security principles:
 - Separate Terraform deployer identity for infrastructure deployment
 - AWS credentials are resolved through the AWS default credential provider chain
 - The validator targets configured buckets directly and does not require account-wide S3 bucket listing
+- Terraform-managed S3 lab bucket is created with Object Lock enabled
+- Object Lock uses Governance mode with a 1-day default retention period for lab safety
+- Bucket policy denies insecure non-TLS transport
+- Bucket ownership is enforced with ACLs disabled
 - Environment variables are excluded from GitHub
 - Terraform state files are excluded from GitHub
+- Local Terraform variable files are excluded from GitHub
 - Public S3 access is blocked by default
 
 ---
@@ -407,8 +430,9 @@ This project follows core cloud security principles:
 - Local LLM integration with Ollama
 - CrewAI multi-agent orchestration
 - Incident response automation
-- JSON security reports
 - GitHub Actions workflow with OIDC-based AWS authentication
+- AWS SSO or temporary credentials for local development
+- SSE-KMS with customer-managed keys and key rotation
 
 ---
 
