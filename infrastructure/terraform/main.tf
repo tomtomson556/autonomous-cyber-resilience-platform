@@ -1,5 +1,6 @@
 resource "aws_s3_bucket" "cyber_resilience_lab" {
-  bucket = var.bucket_name
+  bucket              = var.bucket_name
+  object_lock_enabled = true
 
   tags = {
     Project     = "CyberResiliencePlatform"
@@ -24,6 +25,18 @@ resource "aws_s3_bucket_versioning" "versioning" {
   }
 }
 
+resource "aws_s3_bucket_object_lock_configuration" "object_lock" {
+  bucket = aws_s3_bucket.cyber_resilience_lab.id
+
+  rule {
+    default_retention {
+      mode = "GOVERNANCE"
+      days = 1
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.versioning]
+}
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "encryption" {
   bucket = aws_s3_bucket.cyber_resilience_lab.id
