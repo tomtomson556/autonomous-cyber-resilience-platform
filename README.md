@@ -8,14 +8,15 @@ AI-assisted cyber resilience and backup security validation platform for hybrid 
 
 This project demonstrates an enterprise-style security validation workflow for cloud backup infrastructure using:
 
-- AWS S3
-- Python
-- boto3
-- IAM
-- S3 Object Lock
-- Encryption Validation
-- Security Automation
-- Terraform
+* AWS S3
+* Python
+* boto3
+* IAM
+* S3 Object Lock
+* Encryption Validation
+* Security Automation
+* Terraform
+* GitHub Actions OIDC
 
 The platform validates whether backup storage is configured according to modern cloud security best practices.
 
@@ -38,6 +39,9 @@ flowchart LR
     H[Terraform Infrastructure as Code] --> C
     I[IAM Least Privilege Users] --> B
     J[JSON Security Report] --> M[Local Reports Directory]
+
+    N[GitHub Actions OIDC] --> O[Read-only AWS Validator Role]
+    O --> B
 ```
 
 ---
@@ -48,30 +52,32 @@ flowchart LR
 
 Automated validation of:
 
-- Bucket Versioning
-- Server-side Encryption
-- Object Lock capability
-- Public Access Block configuration
-- Bucket policy public exposure status
-- TLS-only bucket policy enforcement
-- S3 Object Ownership with ACLs disabled
+* Bucket Versioning
+* Server-side Encryption
+* Object Lock capability
+* Public Access Block configuration
+* Bucket policy public exposure status
+* TLS-only bucket policy enforcement
+* S3 Object Ownership with ACLs disabled
 
 ### AWS Integration
 
-- IAM-based authentication
-- AWS CLI integration
-- boto3 SDK automation
-- AWS default credential provider chain support
+* IAM-based authentication
+* AWS CLI integration
+* boto3 SDK automation
+* AWS default credential provider chain support
+* GitHub Actions OIDC authentication for read-only cloud validation
 
 ### Security Controls
 
-- Immutable-storage-ready configuration
-- Encrypted object storage
-- Public exposure prevention
-- TLS-only data access
-- ACL-free bucket ownership enforcement
-- Least-privilege IAM access
-- Machine-readable JSON security report output
+* Immutable-storage-ready configuration
+* Encrypted object storage
+* Public exposure prevention
+* TLS-only data access
+* ACL-free bucket ownership enforcement
+* Least-privilege IAM access
+* Short-lived AWS credentials through GitHub Actions OIDC
+* Machine-readable JSON security report output
 
 ### Infrastructure as Code with Terraform
 
@@ -79,36 +85,52 @@ The project includes Terraform-based infrastructure deployment for the S3 lab en
 
 Terraform provisions:
 
-- S3 bucket
-- Bucket versioning
-- Server-side encryption
-- Public access blocking
-- S3 Object Lock enabled at bucket creation
-- Object Lock default retention in Governance mode
-- Bucket owner enforced object ownership
-- TLS-only bucket policy
-- Resource tagging
-- Terraform outputs for bucket name, ARN, and region
+* S3 bucket
+* Bucket versioning
+* Server-side encryption
+* Public access blocking
+* S3 Object Lock enabled at bucket creation
+* Object Lock default retention in Governance mode
+* Bucket owner enforced object ownership
+* TLS-only bucket policy
+* Resource tagging
+* Terraform outputs for bucket name, ARN, and region
 
 This demonstrates reproducible infrastructure deployment and cloud security automation using Infrastructure as Code.
+
+### OIDC-based AWS Security Validation
+
+The project includes a manual GitHub Actions workflow that validates AWS S3 security controls using OpenID Connect.
+
+This workflow:
+
+* Runs manually through `workflow_dispatch`
+* Assumes a dedicated read-only AWS IAM role
+* Uses short-lived AWS credentials
+* Does not require AWS access keys in GitHub Secrets
+* Runs the Python S3 security validator against the lab bucket
+* Uploads the generated JSON security report as a GitHub Actions artifact
+
+The AWS role used by this workflow is restricted to the repository and the `main` branch.
 
 ---
 
 ## Technologies
 
-- Python 3
-- AWS S3
-- boto3
-- IAM
-- AWS CLI
-- Terraform
-- Git
-- GitHub
-- Infrastructure as Code
-- pytest
-- Ruff
-- GitHub Actions
-- Dependabot
+* Python 3
+* AWS S3
+* boto3
+* IAM
+* AWS CLI
+* Terraform
+* Git
+* GitHub
+* Infrastructure as Code
+* pytest
+* Ruff
+* GitHub Actions
+* GitHub Actions OIDC
+* Dependabot
 
 ---
 
@@ -116,7 +138,7 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 
 ```text
 .
-├── .github/workflows/              # GitHub Actions CI pipeline
+├── .github/workflows/              # GitHub Actions CI and AWS validation workflows
 ├── docs/                           # Documentation and example reports
 ├── infrastructure/terraform/       # Terraform infrastructure definitions
 ├── reports/                        # Local generated reports, ignored by Git
@@ -132,11 +154,13 @@ This demonstrates reproducible infrastructure deployment and cloud security auto
 
 Key components:
 
-- `src/tools/aws_s3_security.py` runs the S3 security validation.
-- `infrastructure/terraform/` defines the S3 lab infrastructure as code.
-- `docs/example_s3_security_report.json` shows a safe example output.
-- `reports/` stores local runtime reports and is intentionally excluded from GitHub.
-- `tests/` contains unit tests using mocked boto3 clients.
+* `src/tools/aws_s3_security.py` runs the S3 security validation.
+* `infrastructure/terraform/` defines the S3 lab infrastructure as code.
+* `.github/workflows/ci.yml` runs Python, test, linting, and Terraform validation.
+* `.github/workflows/aws-security-validation.yml` runs the OIDC-based AWS S3 security validation workflow.
+* `docs/example_s3_security_report.json` shows a safe example output.
+* `reports/` stores local runtime reports and is intentionally excluded from GitHub.
+* `tests/` contains unit tests using mocked boto3 clients.
 
 ---
 
@@ -172,6 +196,7 @@ Then configure your local `.env` file:
 
 ```text
 AWS_DEFAULT_REGION=eu-central-1
+AWS_PROFILE=cyber-resilience-bot
 BUCKET_NAME=your_s3_bucket_name_here
 ```
 
@@ -210,26 +235,26 @@ ruff check src tests
 
 The test suite includes unit tests for:
 
-- S3 bucket name validation
-- Bucket versioning checks
-- Server-side encryption checks
-- Object Lock checks
-- Public Access Block checks
-- Bucket policy exposure checks
-- Secure transport policy checks
-- Bucket ownership enforcement checks
-- JSON report structure
+* S3 bucket name validation
+* Bucket versioning checks
+* Server-side encryption checks
+* Object Lock checks
+* Public Access Block checks
+* Bucket policy exposure checks
+* Secure transport policy checks
+* Bucket ownership enforcement checks
+* JSON report structure
 
 AWS API behavior is tested with mocked boto3 clients, so unit tests do not require live AWS access.
 
 The project also includes a GitHub Actions CI workflow that automatically validates:
 
-- Python dependency installation
-- Ruff linting
-- Python syntax compilation
-- Unit tests
-- Terraform formatting
-- Terraform validation
+* Python dependency installation
+* Ruff linting
+* Python syntax compilation
+* Unit tests
+* Terraform formatting
+* Terraform validation
 
 ---
 
@@ -240,15 +265,15 @@ and Terraform providers.
 
 Automated dependency updates are configured for:
 
-- Python dependencies via `pip`
-- GitHub Actions
-- Terraform providers
+* Python dependencies via `pip`
+* GitHub Actions
+* Terraform providers
 
 AWS SDK related Python packages are grouped into a single Dependabot update group:
 
-- `boto3`
-- `botocore`
-- `s3transfer`
+* `boto3`
+* `botocore`
+* `s3transfer`
 
 Terraform AWS provider major version updates are intentionally ignored by Dependabot. Major provider
 upgrades can introduce breaking changes and should be tested separately with `terraform plan` before
@@ -401,38 +426,78 @@ The Terraform-managed lab bucket is created with Object Lock enabled at bucket c
 
 ---
 
+## GitHub Actions OIDC Validation
+
+The repository includes a manual AWS validation workflow:
+
+```text
+.github/workflows/aws-security-validation.yml
+```
+
+This workflow uses GitHub Actions OIDC to assume a dedicated AWS IAM role:
+
+```text
+GitHubActionsS3ValidatorRole
+```
+
+The role is read-only and scoped to the Terraform-managed S3 lab bucket.
+
+The workflow can be started manually from GitHub Actions or through the GitHub CLI:
+
+```bash
+gh workflow run "AWS S3 Security Validation" --ref main
+```
+
+Watch the workflow run:
+
+```bash
+gh run watch
+```
+
+The workflow validates the live AWS bucket and uploads the generated report as an artifact:
+
+```text
+s3-security-report
+```
+
+This allows cloud security validation from GitHub Actions without storing AWS access keys in GitHub Secrets.
+
+---
+
 ## Security Notes
 
 This project follows core cloud security principles:
 
-- No root-account access for daily operations
-- MFA enabled for administrative access
-- Dedicated IAM users for separate responsibilities
-- Least-privilege IAM policy for the security validator
-- Separate Terraform deployer identity for infrastructure deployment
-- AWS credentials are resolved through the AWS default credential provider chain
-- The validator targets configured buckets directly and does not require account-wide S3 bucket listing
-- Terraform-managed S3 lab bucket is created with Object Lock enabled
-- Object Lock uses Governance mode with a 1-day default retention period for lab safety
-- Bucket policy denies insecure non-TLS transport
-- Bucket ownership is enforced with ACLs disabled
-- Environment variables are excluded from GitHub
-- Terraform state files are excluded from GitHub
-- Local Terraform variable files are excluded from GitHub
-- Public S3 access is blocked by default
+* No root-account access for daily operations
+* MFA enabled for administrative access
+* Dedicated IAM users for separate responsibilities
+* Least-privilege IAM policy for the local security validator
+* Separate Terraform deployer identity for infrastructure deployment
+* Dedicated read-only GitHub Actions OIDC role for cloud validation
+* GitHub Actions uses short-lived AWS credentials through OIDC
+* AWS credentials are resolved through the AWS default credential provider chain
+* The validator targets configured buckets directly and does not require account-wide S3 bucket listing
+* Terraform-managed S3 lab bucket is created with Object Lock enabled
+* Object Lock uses Governance mode with a 1-day default retention period for lab safety
+* Bucket policy denies insecure non-TLS transport
+* Bucket ownership is enforced with ACLs disabled
+* Environment variables are excluded from GitHub
+* Terraform state files are excluded from GitHub
+* Local Terraform variable files are excluded from GitHub
+* Public S3 access is blocked by default
 
 ---
 
 ## Future Roadmap
 
-- Veeam API integration
-- AI-based anomaly detection
-- Local LLM integration with Ollama
-- CrewAI multi-agent orchestration
-- Incident response automation
-- GitHub Actions workflow with OIDC-based AWS authentication
-- AWS SSO or temporary credentials for local development
-- SSE-KMS with customer-managed keys and key rotation
+* Veeam API integration
+* AI-based anomaly detection
+* Local LLM integration with Ollama
+* CrewAI multi-agent orchestration
+* Incident response automation
+* AWS SSO or temporary credentials for local development
+* SSE-KMS with customer-managed keys and key rotation
+* Separate OIDC-based Terraform deployment workflow with environment approval
 
 ---
 
