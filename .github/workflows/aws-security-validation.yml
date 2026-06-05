@@ -7,6 +7,9 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   validate-s3-security:
     name: Validate S3 Security Controls
