@@ -31,7 +31,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Configure AWS credentials through OIDC
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::061650022648:role/GitHubActionsS3ValidatorRole
           role-session-name: s3-security-validation-${{ github.run_id }}
@@ -44,7 +44,7 @@ jobs:
 
       - name: Upload validation report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: s3-security-report
           path: reports/s3_security_report.json
