@@ -200,11 +200,13 @@ AWS_PROFILE=cyber-resilience-bot
 BUCKET_NAME=your_s3_bucket_name_here
 ```
 
-AWS credentials are resolved through the AWS default credential provider chain. For local lab usage,
-credentials can be provided through environment variables, an AWS CLI profile, AWS SSO, or another supported
-boto3 credential source.
+AWS credentials are resolved through the AWS default credential provider chain. For local lab usage, prefer an
+AWS CLI profile backed by AWS SSO or another temporary-credential source. GitHub Actions cloud validation uses
+OIDC and does not require AWS access keys in GitHub Secrets.
 
-When using environment variables locally, the following values may be set outside Git:
+Long-lived environment-variable access keys are not recommended. If they are used temporarily for local lab
+testing, keep them outside Git, rotate them after use, and prefer replacing them with AWS SSO or profile-based
+temporary credentials:
 
 ```text
 AWS_ACCESS_KEY_ID=your_access_key_here
@@ -470,7 +472,7 @@ This project follows core cloud security principles:
 
 * No root-account access for daily operations
 * MFA enabled for administrative access
-* Dedicated IAM users for separate responsibilities
+* Dedicated IAM roles and identities for separate responsibilities
 * Least-privilege IAM policy for the local security validator
 * Separate Terraform deployer identity for infrastructure deployment
 * Dedicated read-only GitHub Actions OIDC role for cloud validation

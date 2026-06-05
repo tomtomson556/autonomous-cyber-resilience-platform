@@ -11,7 +11,9 @@ This project is now aligned around a stronger cyber-resilience posture for S3-ba
 - Validate bucket policy status is not public.
 - Validate an explicit TLS-only bucket policy.
 - Validate Object Ownership is `BucketOwnerEnforced`, which disables ACLs.
-- Provision matching Terraform controls for TLS-only access and bucket-owner-enforced object ownership.
+- Provision matching Terraform controls for TLS-only access, bucket-owner-enforced object ownership, and S3 Object Lock.
+- Provision the Terraform-managed lab bucket with Object Lock enabled at bucket creation time.
+- Configure S3 Object Lock default retention in Governance mode with a 1-day retention period for lab safety.
 
 ## Next high-value phases
 
@@ -37,5 +39,4 @@ This project is now aligned around a stronger cyber-resilience posture for S3-ba
 
 ## Apply notes
 
-Object Lock is intentionally strong. Once enabled on a bucket, it cannot be disabled, and versioning cannot be suspended. Terraform Object Lock provisioning is intentionally left for a separate, explicitly reviewed change because enabling it on an existing bucket can require replacement or irreversible configuration changes.
-
+Object Lock is intentionally strong. Once enabled on a bucket, it cannot be disabled, and versioning cannot be suspended. The Terraform-managed lab bucket now provisions Object Lock at bucket creation time and applies a 1-day default retention period in Governance mode. Existing buckets without Object Lock should still be treated carefully because enabling Object Lock later can require replacement or an explicitly reviewed migration path.
