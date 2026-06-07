@@ -10,22 +10,30 @@ The Python validator should only read and validate the security configuration of
 
 Terraform deployment access should be separated from validator access because Terraform needs infrastructure management permissions, while the validator only needs read-only evidence collection permissions.
 
-## Recommended role separation
+## Identity and role separation
 
-Use two separate AWS roles:
+Validation and infrastructure deployment use separate AWS identities with
+least-privilege permissions:
 
-* `CyberResilienceTerraformDeployer`
+* Local S3 validator identity
 
-  * Used for Terraform-managed infrastructure deployment.
+  * Accessed through the AWS default credential provider chain.
+  * Currently documented with the local AWS profile `cyber-resilience-bot`.
+  * Has read-only permissions for security validation.
+
+* Local Terraform deployment identity
+
+  * Uses a separate AWS profile or identity.
   * May create, update, or delete lab infrastructure.
-  * Should only be used for infrastructure deployment tasks.
+  * Must not be used for routine security validation.
+  * OIDC-based Terraform deployment is not currently implemented.
 
-* `CyberResilienceS3Validator`
+* `GitHubActionsS3ValidatorRole`
 
-  * Used by the Python S3 security validator.
+  * Assumed by the GitHub Actions S3 security validation workflow through OIDC.
   * Read-only access.
-  * Scoped to explicitly configured S3 backup buckets.
-  * Should not have write, delete, or account-wide listing permissions.
+  * Scoped to the `cyber-resilience-objectlock-lab-tom-2026` S3 bucket.
+  * Does not grant write, delete, or account-wide listing permissions.
 
 ## Validator permissions
 
@@ -52,32 +60,54 @@ These permissions support validation of:
 * TLS-only bucket policy enforcement
 * Bucket-owner-enforced object ownership
 
-## Credential strategy
+## Current credential strategy
 
 Long-lived access keys may be used for local learning and lab testing, but they are not the target architecture.
 
-Preferred future state:
+The manual GitHub Actions S3 security validation workflow currently:
 
-* Human access through IAM Identity Center / SSO with temporary credentials.
-* Separate AWS roles for Terraform deployment and security validation.
-* GitHub Actions authentication through OIDC instead of stored AWS access keys.
-* Trust policies restricted to the specific GitHub repository and branch.
-* MFA for human administrative access.
-* Root user not used for daily work.
+* Authenticates to AWS through GitHub Actions OIDC.
+* Assumes the dedicated `GitHubActionsS3ValidatorRole`.
+* Uses short-lived AWS credentials instead of stored AWS access keys.
+* Restricts role assumption to this repository's `main` branch.
+* Uses a read-only permission policy scoped to the
+  `cyber-resilience-objectlock-lab-tom-2026` S3 bucket.
 
-## GitHub Actions OIDC target state
+Human administrative access should use IAM Identity Center / SSO with temporary
+credentials where available. MFA should protect human administrative access,
+and the root user should not be used for daily work.
 
-If GitHub Actions later performs live AWS validation or deployment, it should not use stored AWS access keys.
+## Implemented GitHub Actions OIDC validation
 
-Instead, GitHub Actions should assume a dedicated AWS IAM role through OIDC.
+GitHub Actions performs live, read-only S3 security validation by assuming the
+dedicated `GitHubActionsS3ValidatorRole` through OIDC.
 
-The role trust policy should be restricted to:
+The implemented trust policy is restricted to:
 
 * The specific GitHub repository.
-* The intended branch or environment.
-* The required GitHub Actions workflow context.
+* The `main` branch.
+* The AWS Security Token Service audience.
 
-This reduces the risk of leaked long-lived credentials and keeps CI/CD access auditable and scoped.
+The role permission policy is restricted to the read-only S3 configuration
+actions required by the validator and the
+`cyber-resilience-objectlock-lab-tom-2026` bucket. It does not grant S3 write,
+delete, or account-wide listing permissions.
+
+The detailed trust and permission policies are documented in:
+
+```text
+docs/github-oidc-validator-role.md
+```
+
+This implementation reduces the risk of leaked long-lived credentials and
+keeps cloud validation access auditable and scoped.
+
+## Terraform deployment access
+
+Terraform deployment through GitHub Actions OIDC is not currently implemented.
+Terraform deployment permissions must remain separate from the read-only
+validator role. The `GitHubActionsS3ValidatorRole` must never be extended with
+infrastructure deployment, S3 write, or S3 delete permissions.
 
 ## AccessDenied handling
 
@@ -101,7 +131,7 @@ A future improvement should introduce an `UNKNOWN` or `NOT_CHECKED` status for c
 Planned IAM-related improvements:
 
 * Replace local long-lived access keys with temporary credentials.
-* Add GitHub Actions OIDC-based AWS role assumption.
+* Add a separate OIDC-based Terraform deployment workflow and deployment role.
 * Add IAM Access Analyzer evidence for policy validation and least-privilege review.
 * Add an `UNKNOWN` report status for checks blocked by insufficient IAM permissions.
 * Add separate IAM documentation for Terraform deployment permissions.
