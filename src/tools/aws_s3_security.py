@@ -11,6 +11,8 @@ from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 from botocore.exceptions import PartialCredentialsError
 from dotenv import load_dotenv
 
+from src.tools.security_status import calculate_overall_status
+
 load_dotenv()
 
 AWS_REGION = os.getenv("AWS_DEFAULT_REGION")
@@ -177,27 +179,59 @@ def check_public_access_block(s3_client, bucket_name: str) -> bool:
         return False
 
 
-def check_bucket_policy_not_public(s3_client, bucket_name: str) -> bool:
+def check_bucket_policy_not_public(s3_client, bucket_name: str) -> dict:
     try:
         response = s3_client.get_bucket_policy_status(Bucket=bucket_name)
-        return response.get("PolicyStatus", {}).get("IsPublic") is False
+        is_public = response.get("PolicyStatus", {}).get("IsPublic")
+
+        if is_public is False:
+            return {
+                "status": "PASS",
+                "reason": None,
+                "message": "The bucket policy is not public.",
+            }
+
+        if is_public is True:
+            return {
+                "status": "FAIL",
+                "reason": None,
+                "message": "The bucket policy is public.",
+            }
+
+        return {
+            "status": "UNKNOWN",
+            "reason": "IncompleteResponse",
+            "message": "The bucket policy status response is incomplete.",
+        }
     except ClientError as error:
         error_code = get_client_error_code(error)
 
         if error_code == "NoSuchBucketPolicy":
-            return True
+            return {
+                "status": "PASS",
+                "reason": "NoSuchBucketPolicy",
+                "message": "The bucket has no bucket policy that could be public.",
+            }
 
         if error_code == "AccessDenied":
             LOGGER.warning(
                 "Bucket policy status check could not be completed due to AccessDenied."
             )
-            return False
+            return {
+                "status": "UNKNOWN",
+                "reason": "AccessDenied",
+                "message": "The bucket policy status could not be evaluated.",
+            }
 
         raise_for_critical_s3_error(error, "bucket_policy_not_public")
         LOGGER.warning(
             "Bucket policy status check failed with AWS error: %s", error_code
         )
-        return False
+        return {
+            "status": "UNKNOWN",
+            "reason": error_code,
+            "message": "The bucket policy status could not be evaluated.",
+        }
 
 
 def _as_list(value):
@@ -324,6 +358,24 @@ def check_bucket_owner_enforced(s3_client, bucket_name: str) -> bool:
         return False
 
 
+def _normalize_check_result(result) -> dict:
+    if isinstance(result, dict):
+        return result
+
+    if result:
+        return {
+            "status": "PASS",
+            "reason": None,
+            "message": "The check passed.",
+        }
+
+    return {
+        "status": "FAIL",
+        "reason": None,
+        "message": "The check failed.",
+    }
+
+
 def build_report(s3_client, bucket_name: str) -> dict:
     checks = {
         "versioning": check_versioning(s3_client, bucket_name),
@@ -341,15 +393,17 @@ def build_report(s3_client, bucket_name: str) -> dict:
         "bucket_owner_enforced": check_bucket_owner_enforced(s3_client, bucket_name),
     }
 
-    overall_status = "SECURE" if all(checks.values()) else "NOT_SECURE"
+    report_checks = {
+        check_name: _normalize_check_result(result)
+        for check_name, result in checks.items()
+    }
+    check_statuses = [result["status"] for result in report_checks.values()]
+    overall_status = calculate_overall_status(check_statuses)
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "bucket": bucket_name,
-        "checks": {
-            check_name: "PASS" if passed else "FAIL"
-            for check_name, passed in checks.items()
-        },
+        "checks": report_checks,
         "overall_status": overall_status,
     }
 
@@ -359,7 +413,8 @@ def print_report(report: dict) -> None:
     print("============================")
     print(f"Bucket: {report['bucket']}\n")
 
-    for check_name, status in report["checks"].items():
+    for check_name, result in report["checks"].items():
+        status = result["status"] if isinstance(result, dict) else result
         print(f"{check_name}: {status}")
 
     print("\nOverall Status:", report["overall_status"])
