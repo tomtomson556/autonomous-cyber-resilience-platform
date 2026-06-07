@@ -11,8 +11,11 @@ from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 from botocore.exceptions import PartialCredentialsError
 from dotenv import load_dotenv
 
-from src.tools.security_status import calculate_overall_status
-
+try:
+    from src.tools.security_status import calculate_overall_status
+except ModuleNotFoundError:
+    from security_status import calculate_overall_status
+    
 load_dotenv()
 
 AWS_REGION = os.getenv("AWS_DEFAULT_REGION")
