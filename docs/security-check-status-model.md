@@ -60,7 +60,18 @@ All controls pass:
 
 ```json
 {
-  "checks": ["PASS", "PASS", "PASS"],
+  "checks": {
+    "versioning": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    },
+    "bucket_policy_not_public": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The bucket policy is not public."
+    }
+  },
   "overall_status": "SECURE"
 }
 ```
@@ -69,7 +80,18 @@ One confirmed security issue:
 
 ```json
 {
-  "checks": ["PASS", "UNKNOWN", "FAIL"],
+  "checks": {
+    "versioning": {
+      "status": "FAIL",
+      "reason": null,
+      "message": "The check failed."
+    },
+    "bucket_policy_not_public": {
+      "status": "UNKNOWN",
+      "reason": "AccessDenied",
+      "message": "The bucket policy status could not be evaluated."
+    }
+  },
   "overall_status": "INSECURE"
 }
 ```
@@ -78,7 +100,18 @@ Incomplete evidence without a confirmed failure:
 
 ```json
 {
-  "checks": ["PASS", "UNKNOWN", "PASS"],
+  "checks": {
+    "versioning": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    },
+    "bucket_policy_not_public": {
+      "status": "UNKNOWN",
+      "reason": "AccessDenied",
+      "message": "The bucket policy status could not be evaluated."
+    }
+  },
   "overall_status": "INCOMPLETE"
 }
 ```

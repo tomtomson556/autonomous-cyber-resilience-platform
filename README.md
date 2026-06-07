@@ -332,17 +332,50 @@ Example JSON report:
   "timestamp": "2026-06-03T10:00:00+00:00",
   "bucket": "cyber-resilience-backup-lab-example",
   "checks": {
-    "versioning": "PASS",
-    "encryption": "PASS",
-    "object_lock": "PASS",
-    "public_access_block": "PASS",
-    "bucket_policy_not_public": "PASS",
-    "secure_transport_policy": "PASS",
-    "bucket_owner_enforced": "PASS"
+    "versioning": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    },
+    "encryption": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    },
+    "object_lock": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    },
+    "public_access_block": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    },
+    "bucket_policy_not_public": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The bucket policy is not public."
+    },
+    "secure_transport_policy": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    },
+    "bucket_owner_enforced": {
+      "status": "PASS",
+      "reason": null,
+      "message": "The check passed."
+    }
   },
   "overall_status": "SECURE"
 }
 ```
+
+Each check includes a status, an optional reason, and a short explanation.
+`UNKNOWN` means that a check could not be evaluated with sufficient confidence,
+for example because of `AccessDenied` or missing evidence. `INCOMPLETE` means
+that no check returned `FAIL`, but at least one check returned `UNKNOWN`.
 
 ---
 

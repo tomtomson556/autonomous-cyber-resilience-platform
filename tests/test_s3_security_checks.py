@@ -1,9 +1,11 @@
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 from botocore.exceptions import ClientError
 
 from src.tools.aws_s3_security import (
+    build_report,
     check_bucket_owner_enforced,
     check_bucket_policy_not_public,
     check_encryption,
@@ -156,7 +158,11 @@ def test_check_bucket_policy_not_public_passes_for_non_public_policy_status():
         }
     }
 
-    assert check_bucket_policy_not_public(mock_client, TEST_BUCKET) is True
+    assert check_bucket_policy_not_public(mock_client, TEST_BUCKET) == {
+        "status": "PASS",
+        "reason": None,
+        "message": "The bucket policy is not public.",
+    }
 
 
 def test_check_bucket_policy_not_public_fails_for_public_policy_status():
@@ -167,7 +173,11 @@ def test_check_bucket_policy_not_public_fails_for_public_policy_status():
         }
     }
 
-    assert check_bucket_policy_not_public(mock_client, TEST_BUCKET) is False
+    assert check_bucket_policy_not_public(mock_client, TEST_BUCKET) == {
+        "status": "FAIL",
+        "reason": None,
+        "message": "The bucket policy is public.",
+    }
 
 
 def test_check_bucket_policy_not_public_passes_without_bucket_policy():
@@ -177,7 +187,106 @@ def test_check_bucket_policy_not_public_passes_without_bucket_policy():
         "GetBucketPolicyStatus",
     )
 
-    assert check_bucket_policy_not_public(mock_client, TEST_BUCKET) is True
+    assert check_bucket_policy_not_public(mock_client, TEST_BUCKET) == {
+        "status": "PASS",
+        "reason": "NoSuchBucketPolicy",
+        "message": "The bucket has no bucket policy that could be public.",
+    }
+
+
+def test_check_bucket_policy_not_public_is_unknown_for_access_denied():
+    mock_client = MagicMock()
+    mock_client.get_bucket_policy_status.side_effect = make_client_error(
+        "AccessDenied",
+        "GetBucketPolicyStatus",
+    )
+
+    assert check_bucket_policy_not_public(mock_client, TEST_BUCKET) == {
+        "status": "UNKNOWN",
+        "reason": "AccessDenied",
+        "message": "The bucket policy status could not be evaluated.",
+    }
+
+
+def test_check_bucket_policy_not_public_raises_for_missing_bucket():
+    mock_client = MagicMock()
+    mock_client.get_bucket_policy_status.side_effect = make_client_error(
+        "NoSuchBucket",
+        "GetBucketPolicyStatus",
+    )
+
+    with pytest.raises(RuntimeError, match="critical AWS error: NoSuchBucket"):
+        check_bucket_policy_not_public(mock_client, TEST_BUCKET)
+
+
+def test_build_report_is_incomplete_for_unknown_without_fail():
+    with (
+        patch("src.tools.aws_s3_security.check_versioning", return_value=True),
+        patch("src.tools.aws_s3_security.check_encryption", return_value=True),
+        patch("src.tools.aws_s3_security.check_object_lock", return_value=True),
+        patch("src.tools.aws_s3_security.check_public_access_block", return_value=True),
+        patch(
+            "src.tools.aws_s3_security.check_bucket_policy_not_public",
+            return_value={
+                "status": "UNKNOWN",
+                "reason": "AccessDenied",
+                "message": "The bucket policy status could not be evaluated.",
+            },
+        ),
+        patch(
+            "src.tools.aws_s3_security.check_secure_transport_policy",
+            return_value=True,
+        ),
+        patch(
+            "src.tools.aws_s3_security.check_bucket_owner_enforced",
+            return_value=True,
+        ),
+    ):
+        report = build_report(MagicMock(), TEST_BUCKET)
+
+    assert report["overall_status"] == "INCOMPLETE"
+    assert report["checks"]["versioning"] == {
+        "status": "PASS",
+        "reason": None,
+        "message": "The check passed.",
+    }
+    assert report["checks"]["bucket_policy_not_public"] == {
+        "status": "UNKNOWN",
+        "reason": "AccessDenied",
+        "message": "The bucket policy status could not be evaluated.",
+    }
+    assert all(
+        set(result) == {"status", "reason", "message"}
+        for result in report["checks"].values()
+    )
+
+
+def test_build_report_fail_takes_precedence_over_unknown():
+    with (
+        patch("src.tools.aws_s3_security.check_versioning", return_value=False),
+        patch("src.tools.aws_s3_security.check_encryption", return_value=True),
+        patch("src.tools.aws_s3_security.check_object_lock", return_value=True),
+        patch("src.tools.aws_s3_security.check_public_access_block", return_value=True),
+        patch(
+            "src.tools.aws_s3_security.check_bucket_policy_not_public",
+            return_value={
+                "status": "UNKNOWN",
+                "reason": "AccessDenied",
+                "message": "The bucket policy status could not be evaluated.",
+            },
+        ),
+        patch(
+            "src.tools.aws_s3_security.check_secure_transport_policy",
+            return_value=True,
+        ),
+        patch(
+            "src.tools.aws_s3_security.check_bucket_owner_enforced",
+            return_value=True,
+        ),
+    ):
+        report = build_report(MagicMock(), TEST_BUCKET)
+
+    assert report["overall_status"] == "INSECURE"
 
 
 def test_check_secure_transport_policy_passes_for_tls_only_deny():
