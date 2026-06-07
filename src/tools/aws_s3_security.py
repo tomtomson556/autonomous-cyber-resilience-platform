@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import os
@@ -11,11 +12,11 @@ from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 from botocore.exceptions import PartialCredentialsError
 from dotenv import load_dotenv
 
-try:
+if __package__:
     from src.tools.security_status import calculate_overall_status
-except ModuleNotFoundError:
+else:
     from security_status import calculate_overall_status
-    
+
 load_dotenv()
 
 AWS_REGION = os.getenv("AWS_DEFAULT_REGION")
@@ -27,6 +28,13 @@ REQUIRED_ENV_VARS = [
 ]
 
 LOGGER = logging.getLogger(__name__)
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Validate security controls for an AWS S3 backup bucket.",
+    )
+    return parser.parse_args(argv)
 
 
 def configure_logging() -> None:
@@ -432,7 +440,8 @@ def save_report(report: dict) -> None:
     print(f"\nJSON report written to: {REPORT_PATH}")
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    parse_args(argv)
     configure_logging()
 
     try:
