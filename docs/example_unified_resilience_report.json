@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0.0",
+  "timestamp": "2026-06-08T10:00:00+00:00",
+  "platform": "autonomous-cyber-resilience-platform",
+  "report_type": "unified_resilience_report",
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "overall_resilience_status": "INCOMPLETE",
+  "evidence_sources": [
+    {
+      "source_id": "aws-s3-validator-example-001",
+      "source_type": "aws_s3_security_validator",
+      "collected_at": "2026-06-08T09:45:00+00:00",
+      "status": "PASS",
+      "reference": "mock://reports/aws-s3-validator-example-001"
+    },
+    {
+      "source_id": "veeam-read-only-example-001",
+      "source_type": "veeam",
+      "collected_at": "2026-06-08T09:50:00+00:00",
+      "status": "PASS",
+      "reference": "mock://reports/veeam-read-only-example-001"
+    },
+    {
+      "source_id": "restore-test-example-001",
+      "source_type": "restore_test",
+      "collected_at": "2026-06-08T09:55:00+00:00",
+      "status": "UNKNOWN",
+      "reason": "NoRecentRestoreTestEvidence",
+      "reference": "mock://reports/restore-test-example-001"
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "m365-example-finance-sharepoint",
+      "asset_name": "Example Finance SharePoint",
+      "source_type": "m365",
+      "backup_system": "veeam",
+      "backup_job": {
+        "job_id": "veeam-job-example-001",
+        "job_name": "Example M365 Finance Backup",
+        "last_successful_backup": "2026-06-08T08:30:00+00:00",
+        "status": "PASS"
+      },
+      "repository": {
+        "repository_id": "veeam-repository-example-001",
+        "storage_target_id": "aws-s3-target-example-001"
+      },
+      "rpo_evaluation": {
+        "objective_hours": 24,
+        "observed_age_hours": 1.5,
+        "evaluated_at": "2026-06-08T10:00:00+00:00",
+        "status": "PASS",
+        "reason": "LastSuccessfulBackupWithinRPO"
+      },
+      "rto_evaluation": {
+        "objective_hours": 8,
+        "observed_recovery_hours": null,
+        "evaluated_at": "2026-06-08T10:00:00+00:00",
+        "status": "UNKNOWN",
+        "reason": "NoRecentRestoreTestEvidence"
+      },
+      "immutability_evidence": {
+        "source_id": "aws-s3-validator-example-001",
+        "storage_target_id": "aws-s3-target-example-001",
+        "status": "PASS",
+        "reason": "S3ObjectLockEnabled"
+      },
+      "restore_test_evidence": {
+        "last_tested_at": null,
+        "status": "UNKNOWN",
+        "reason": "NoRecentRestoreTestEvidence",
+        "message": "No recent restore-test evidence is available."
+      },
+      "risk_score": {
+        "score": 42,
+        "level": "MEDIUM",
+        "rationale": [
+          "RPO evidence passed.",
+          "S3 immutability evidence passed.",
+          "Recent restore-test evidence is unavailable."
+        ]
+      },
+      "recommended_action": {
+        "action_id": "schedule-restore-test-example-001",
+        "action_type": "PLAN_RESTORE_TEST",
+        "summary": "Plan and approve an isolated restore test.",
+        "requires_human_approval": true,
+        "execution_mode": "ADVISORY_ONLY"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-example-restore-test-001",
+      "asset_id": "m365-example-finance-sharepoint",
+      "category": "restore_test_evidence",
+      "status": "UNKNOWN",
+      "reason": "NoRecentRestoreTestEvidence",
+      "message": "Restore capability cannot be confirmed without recent test evidence.",
+      "confirmed_vulnerability": false
+    }
+  ],
+  "recommended_actions": [
+    {
+      "action_id": "schedule-restore-test-example-001",
+      "asset_id": "m365-example-finance-sharepoint",
+      "action_type": "PLAN_RESTORE_TEST",
+      "summary": "Plan and approve an isolated restore test.",
+      "requires_deterministic_policy_check": true,
+      "requires_human_approval": true,
+      "execution_mode": "ADVISORY_ONLY"
+    }
+  ]
+}
