@@ -574,6 +574,9 @@ evaluation before AI assistance and controlled orchestration:
 
 See `docs/2026-modernization-roadmap.md` for the prioritized roadmap and
 `docs/ai-orchestration-use-cases.md` for AI and orchestration guardrails.
+`docs/unified-resilience-report-schema.md` defines the planned cross-source
+report contract for future Veeam, Microsoft cloud, AWS, and SOAR evidence
+correlation.
 
 ---
 
