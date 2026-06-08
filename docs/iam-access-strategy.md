@@ -117,14 +117,20 @@ Some validator checks require specific read permissions, for example:
 * `s3:GetBucketPolicyStatus`
 * `s3:GetBucketOwnershipControls`
 
-If these permissions are missing, the validator may report the affected checks as `FAIL`.
+The status model defines insufficient evidence for an independently evaluable
+check as `UNKNOWN`. Some checks already use this behavior, but the migration is
+not yet complete across every check and `AccessDenied` path. Depending on the
+check, missing permissions may still produce `FAIL` or a hard execution error.
 
 This is conservative, but it does not fully distinguish between:
 
 * A bucket that is insecurely configured.
 * A bucket that could not be fully evaluated because IAM permissions are missing.
 
-A future improvement should introduce an `UNKNOWN` or `NOT_CHECKED` status for checks that cannot be evaluated due to insufficient IAM permissions.
+Future work should complete the migration so that every independently evaluable
+check consistently reports `UNKNOWN` when insufficient IAM permissions prevent
+reliable evaluation. Hard failures that prevent validation as a whole must
+remain execution errors.
 
 ## Future improvements
 
@@ -133,6 +139,7 @@ Planned IAM-related improvements:
 * Replace local long-lived access keys with temporary credentials.
 * Add a separate OIDC-based Terraform deployment workflow and deployment role.
 * Add IAM Access Analyzer evidence for policy validation and least-privilege review.
-* Add an `UNKNOWN` report status for checks blocked by insufficient IAM permissions.
+* Complete consistent `UNKNOWN` handling for independently evaluable checks
+  blocked by insufficient IAM permissions.
 * Add separate IAM documentation for Terraform deployment permissions.
 * Add environment-specific IAM examples for lab, staging, and production-style deployments.

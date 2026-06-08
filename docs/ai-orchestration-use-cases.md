@@ -10,6 +10,10 @@ AI supports monitoring, analysis, and prioritization. It should help
 administrators make informed decisions faster, but it does not replace
 technical security controls or accountable approvals.
 
+In this project, SOAR means controlled Security Orchestration, Automation and
+Response for Backup Resilience. It does not mean fully autonomous production
+automation. AI outputs are advisory, not authoritative.
+
 ## Mandatory safety principle
 
 AI may:
@@ -31,6 +35,17 @@ AI must not independently:
 Production changes are executed exclusively through fixed technical rules,
 least-privilege permissions, documented reviews, and explicit approvals. Every
 recommendation and every resulting action must be logged in a traceable manner.
+
+The enterprise-controlled AI advisory and prioritization layer that influences
+operational prioritization or action proposals must run locally or in an
+environment technically, organizationally, and contractually controlled by the
+enterprise.
+Deterministic policy checks and human approvals remain the final authorization
+authority.
+
+External AI services may support only non-critical tasks such as summarization,
+wording, documentation, and drafting. They must not authorize actions, make
+final security decisions, or independently control production systems.
 
 ## Phase 1: Visibility and administrative assistance
 
@@ -139,24 +154,31 @@ reviews, and approvals.
 
 ### Approval-controlled runbook orchestration
 
-* Select suitable versioned runbooks for a confirmed incident.
+* Propose candidate versioned runbooks for a confirmed incident.
 * Prepare parameters and execution steps as a reviewable draft.
 * Pass execution to existing automation systems only after rule-based
   validation and explicit human approval.
+* Never independently select, approve, or execute a critical runbook.
 
 ## Technical guardrails
 
 * AI components receive read-only access by default.
+* AI outputs are advisory and must identify their evidence, assumptions, and
+  uncertainties.
 * Data sources, recommendations, and uncertainties are presented transparently.
 * Rule-based validators remain authoritative for PASS, FAIL, and compliance
   decisions.
 * Changes are implemented through versioned Infrastructure as Code or runbook
   processes.
+* Critical runbook execution requires a deterministic policy check before human
+  approval and least-privilege execution.
 * Critical actions require a four-eyes review and explicit approval.
 * All analyses, recommendations, reviews, approvals, and actions are logged in
   an audit-ready manner.
 * Recommendations must return an `UNKNOWN` status for incomplete or
   contradictory data instead of implying false certainty.
+* The AI advisory and prioritization layer must be enterprise-controlled.
+* External AI services are restricted to non-critical support tasks.
 
 ## Success criteria
 
