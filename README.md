@@ -4,9 +4,42 @@
 
 AI-assisted cyber resilience and backup security validation platform for hybrid cloud environments.
 
+## Project Status
+
+This repository is a lab, portfolio, and prototype project that demonstrates
+enterprise-style security patterns. It is not production-ready or
+enterprise-ready.
+
+The currently implemented technical core is a read-only AWS S3 security
+evidence collector and rule-based validator. It is the first evidence-collection
+component of a future AI-assisted Cyber-Resilience SOAR platform for backup and
+recovery security.
+
+The project name uses "Autonomous" to describe automated evidence collection,
+validation, and assistance. It does not mean autonomous changes to production
+systems.
+
+## SOAR Direction
+
+In this project, SOAR means controlled Security Orchestration, Automation and
+Response for Backup Resilience. It does not mean fully autonomous production
+automation.
+
+AI may analyze evidence, prioritize findings, summarize results, and prepare
+reports or proposals. It must not independently modify backup jobs, restore
+points, retention policies, IAM, Veeam or AWS configurations, or restore
+operations. Human approval and deterministic policy checks remain the final
+authorization authority for critical actions.
+
+The next technical stage is a Veeam API read-only collector and a Unified
+Resilience Report Schema. Controlled orchestration is a later milestone after
+deterministic rules, risk evaluation, runbook metadata, and approval workflows
+are established.
+
 ## Overview
 
-This project demonstrates an enterprise-style security validation workflow for cloud backup infrastructure using:
+The current implementation demonstrates an enterprise-style security validation
+workflow for cloud backup infrastructure using:
 
 * AWS S3
 * Python
@@ -22,7 +55,7 @@ The platform validates whether backup storage is configured according to modern 
 
 ---
 
-## Architecture
+## Current Implemented Architecture
 
 ```mermaid
 flowchart LR
@@ -525,14 +558,22 @@ This project follows core cloud security principles:
 
 ## Future Roadmap
 
-* Veeam API integration
-* AI-based anomaly detection
-* Local LLM integration with Ollama
-* CrewAI multi-agent orchestration
-* Incident response automation
-* AWS SSO or temporary credentials for local development
-* SSE-KMS with customer-managed keys and key rotation
-* Separate OIDC-based Terraform deployment workflow with environment approval
+The roadmap prioritizes evidence collection and deterministic resilience
+evaluation before AI assistance and controlled orchestration:
+
+* Stabilize the S3 evidence source and complete consistent `UNKNOWN` semantics.
+* Define a versioned Unified Resilience Report Schema.
+* Add a Veeam API read-only collector.
+* Add deterministic RPO/RTO evaluation, restore-test evidence, and risk scoring.
+* Add Microsoft 365 and hybrid workload metadata, historical comparison, and
+  drift detection.
+* Add AI-assisted prioritization and reporting through an enterprise-controlled
+  AI advisory and prioritization layer.
+* Add versioned runbook metadata, policy gates, approval workflows, and
+  controlled orchestration.
+
+See `docs/2026-modernization-roadmap.md` for the prioritized roadmap and
+`docs/ai-orchestration-use-cases.md` for AI and orchestration guardrails.
 
 ---
 

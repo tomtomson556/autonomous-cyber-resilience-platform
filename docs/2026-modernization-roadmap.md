@@ -1,42 +1,109 @@
 # 2026 Modernization Roadmap
 
-This project is now aligned around a stronger cyber-resilience posture for S3-backed backup validation. The current upgrade path focuses on controls that produce evidence, reduce ransomware blast radius, and can be automated in CI or scheduled validation jobs.
+## Strategic direction
+
+This repository is evolving from an AWS S3 security validator into an
+AI-assisted Cyber-Resilience SOAR platform for backup and recovery security.
+The current read-only S3 security evidence collector and rule-based validator
+are the first implemented evidence source.
+
+In this project, SOAR means controlled Security Orchestration, Automation and
+Response for Backup Resilience. It does not mean fully autonomous production
+automation. AI provides advisory analysis, prioritization, summaries, reports,
+and proposals. Deterministic policy checks and human approvals remain the final
+authorization authority for critical actions.
+
+The repository remains a lab, portfolio, and prototype project. The roadmap
+prioritizes reliable evidence and deterministic evaluation before AI assistance
+and controlled orchestration.
 
 ## Implemented baseline
 
-- Validate S3 versioning.
-- Validate approved server-side encryption algorithms.
-- Validate S3 Object Lock capability.
-- Validate full S3 Block Public Access.
-- Validate bucket policy status is not public.
-- Validate an explicit TLS-only bucket policy.
-- Validate Object Ownership is `BucketOwnerEnforced`, which disables ACLs.
-- Provision matching Terraform controls for TLS-only access, bucket-owner-enforced object ownership, and S3 Object Lock.
-- Provision the Terraform-managed lab bucket with Object Lock enabled at bucket creation time.
-- Configure S3 Object Lock default retention in Governance mode with a 1-day retention period for lab safety.
+- Read-only validation of S3 versioning, approved server-side encryption,
+  Object Lock capability, full Block Public Access, non-public bucket policy
+  status, TLS-only access, and `BucketOwnerEnforced` object ownership.
+- Terraform-managed S3 lab bucket with Object Lock enabled at creation,
+  Governance mode, and a 1-day default retention period.
+- GitHub Actions OIDC validation through a dedicated read-only AWS role.
+- Structured check results with `status`, `reason`, and `message`.
+- Check-level `PASS`, `FAIL`, and `UNKNOWN` statuses and overall `SECURE`,
+  `INSECURE`, and `INCOMPLETE` statuses.
 
-## Next high-value phases
+## Foundation Gate: Evidence contract and S3 source stability
 
-1. Add KMS-backed encryption evidence.
+- Stabilize the S3 evidence source and its regression coverage.
+- Apply the documented `UNKNOWN` semantics consistently across all independently
+  evaluable checks.
+- Define and version the structured Security Report Contract.
+- Preserve rule-based validators as the authoritative source for `PASS`, `FAIL`,
+  and `UNKNOWN`.
 
-   Extend Terraform with a customer-managed KMS key, key rotation, bucket keys, and least-privilege key policy. Extend the validator to report whether encryption uses `aws:kms` or `aws:kms:dsse` and which key protects the bucket.
+The status model already defines `UNKNOWN` as missing or incomplete evidence.
+The migration is not yet complete across every validator check and
+`AccessDenied` path. Missing evidence must not be presented as a confirmed
+security failure.
 
-2. Add recovery and ransomware-resilience scoring.
+## Milestone 1: Unified resilience evidence and Veeam visibility
 
-   Add checks for cross-region replication, lifecycle rules for noncurrent versions, restore drills, and report fields that distinguish prevention, detection, and recovery controls.
+- Define a versioned Unified Resilience Report Schema.
+- Implement a Veeam API read-only collector.
+- Produce example reports for backup jobs, repositories, restore points, and
+  storage targets.
+- Map source evidence, collection timestamps, and confidence or completeness
+  information into the unified schema.
 
-3. Add AWS-native detection coverage.
+## Milestone 2: Deterministic resilience evaluation
 
-   Add optional validation for CloudTrail S3 data events, GuardDuty S3 protection or Malware Protection for S3, AWS Config managed rules, and IAM Access Analyzer findings.
+- Implement deterministic RPO and RTO evaluation rules.
+- Add restore-test evidence.
+- Add cross-source risk scoring based on explicit, reviewable rules.
+- Keep scores as prioritization aids rather than final authorization decisions.
 
-4. Add CI supply-chain evidence.
+## Milestone 3: Workload context and historical evidence
 
-   Generate SBOM output, run dependency vulnerability scanning, upload test coverage, and add pinned GitHub Action permissions per job.
+- Add Microsoft 365 and hybrid workload metadata.
+- Compare historical resilience reports.
+- Detect configuration and evidence drift.
+- Preserve source timestamps and provenance for every comparison.
 
-5. Add an operator-facing interface.
+## Milestone 4: AI-assisted prioritization and reporting
 
-   Build a small dashboard that can compare reports over time, show drift, and export executive and technical summaries from the same machine-readable report.
+- Add AI-assisted prioritization, explanation, and report drafting.
+- Introduce an enterprise-controlled AI advisory and prioritization layer.
+- Keep AI outputs advisory, not authoritative.
+- Restrict external AI services to non-critical support tasks such as
+  summarization, wording, documentation, and drafting.
+
+The enterprise-controlled AI advisory and prioritization layer that influences
+operational prioritization or action
+proposals must run locally or in an environment technically, organizationally,
+and contractually controlled by the enterprise.
+
+## Milestone 5: Controlled orchestration
+
+- Define versioned runbook metadata.
+- Add deterministic policy gates.
+- Add an explicit human approval workflow.
+- Add controlled orchestration through least-privilege execution identities.
+- Audit analyses, proposals, policy decisions, approvals, and resulting actions.
+
+AI may propose candidate runbooks and prepare reviewable parameters. It must not
+select, authorize, or execute critical runbooks independently.
+
+## Parallel backlog
+
+- Add SSE-KMS with customer-managed keys and key rotation.
+- Add AWS-native detection evidence.
+- Add IAM Access Analyzer evidence.
+- Add SBOM and supply-chain evidence.
+- Continue S3 evidence source hardening.
+- Evaluate temporary credentials and separately approved deployment workflows.
 
 ## Apply notes
 
-Object Lock is intentionally strong. Once enabled on a bucket, it cannot be disabled, and versioning cannot be suspended. The Terraform-managed lab bucket now provisions Object Lock at bucket creation time and applies a 1-day default retention period in Governance mode. Existing buckets without Object Lock should still be treated carefully because enabling Object Lock later can require replacement or an explicitly reviewed migration path.
+Object Lock is intentionally strong. Once enabled on a bucket, it cannot be
+disabled, and versioning cannot be suspended. The Terraform-managed lab bucket
+provisions Object Lock at bucket creation time and applies a 1-day default
+retention period in Governance mode. Existing buckets without Object Lock
+should be treated carefully because enabling Object Lock later can require
+replacement or an explicitly reviewed migration path.
