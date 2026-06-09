@@ -10,10 +10,10 @@ This repository is a lab, portfolio, and prototype project that demonstrates
 enterprise-style security patterns. It is not production-ready or
 enterprise-ready.
 
-The currently implemented technical core is a read-only AWS S3 security
-evidence collector and rule-based validator. It is the first evidence-collection
-component of a future AI-assisted Cyber-Resilience SOAR platform for backup and
-recovery security.
+The currently implemented technical core includes a read-only AWS S3 security
+evidence collector and rule-based validator, versioned S3 and mock Veeam
+evidence contracts, and deterministic local adapters into the Unified
+Resilience Report Schema.
 
 The project name uses "Autonomous" to describe automated evidence collection,
 validation, and assistance. It does not mean autonomous changes to production
@@ -31,8 +31,10 @@ points, retention policies, IAM, Veeam or AWS configurations, or restore
 operations. Human approval and deterministic policy checks remain the final
 authorization authority for critical actions.
 
-The next technical stage is a Veeam API read-only collector that maps evidence
-into the Unified Resilience Report Schema. Controlled orchestration is a later
+The next Veeam integration stage is a real API read-only collector that builds
+on the stabilized mock-based Veeam Evidence Report v1 semantics. The current
+contract and its local Unified Resilience Report adapter accept mock evidence
+only and do not access a Veeam API. Controlled orchestration is a later
 milestone after deterministic rules, risk evaluation, runbook metadata, and
 approval workflows are established.
 
@@ -112,6 +114,23 @@ Automated validation of:
 * Short-lived AWS credentials through GitHub Actions OIDC
 * Machine-readable JSON security report output
 
+### Mock Veeam Evidence Contract
+
+The project includes a deterministic mock-only Veeam Evidence Report v1
+contract and a local adapter into the Unified Resilience Report Schema.
+
+The mock contract covers:
+
+* Backup jobs
+* Repositories
+* Restore points
+* Storage targets
+* Structured `PASS`, `FAIL`, and `UNKNOWN` evidence
+* Source timestamps and provenance
+
+It contains no Veeam credentials, endpoints, SDK clients, network calls, or
+production-changing behavior. A real Veeam read-only collector is a later step.
+
 ### Infrastructure as Code with Terraform
 
 The project includes Terraform-based infrastructure deployment for the S3 lab environment.
@@ -188,10 +207,16 @@ The AWS role used by this workflow is restricted to the repository and the `main
 Key components:
 
 * `src/tools/aws_s3_security.py` runs the S3 security validation.
+* `src/tools/s3_unified_report_adapter.py` maps S3 Security Report v1 evidence
+  into the Unified Resilience Report Schema.
+* `src/tools/veeam_unified_report_adapter.py` maps mock Veeam Evidence Report v1
+  evidence into the Unified Resilience Report Schema.
 * `infrastructure/terraform/` defines the S3 lab infrastructure as code.
 * `.github/workflows/ci.yml` runs Python, test, linting, and Terraform validation.
 * `.github/workflows/aws-security-validation.yml` runs the OIDC-based AWS S3 security validation workflow.
 * `docs/example_s3_security_report.json` shows a safe example output.
+* `docs/example_veeam_evidence_report.json` shows deterministic mock-only Veeam
+  evidence.
 * `reports/` stores local runtime reports and is intentionally excluded from GitHub.
 * `tests/` contains unit tests using mocked boto3 clients.
 
@@ -562,8 +587,10 @@ This project follows core cloud security principles:
 The roadmap prioritizes evidence collection and deterministic resilience
 evaluation before AI assistance and controlled orchestration:
 
-* Define a versioned Unified Resilience Report Schema.
-* Add a Veeam API read-only collector.
+* Stabilize source contracts and deterministic adapters into the Unified
+  Resilience Report Schema.
+* Add a real Veeam API read-only collector that builds on the mock-stabilized
+  Veeam evidence semantics with explicitly versioned real-collection metadata.
 * Add deterministic RPO/RTO evaluation, restore-test evidence, and risk scoring.
 * Add Microsoft 365 and hybrid workload metadata, historical comparison, and
   drift detection.

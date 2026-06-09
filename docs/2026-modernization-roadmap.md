@@ -30,6 +30,11 @@ and controlled orchestration.
   `INSECURE`, and `INCOMPLETE` statuses.
 - Versioned `s3-security-report/v1` evidence contract with consistent
   `UNKNOWN` semantics for inaccessible, incomplete, or malformed evidence.
+- Deterministic local S3-to-unified adapter.
+- Mock-only `veeam-evidence-report/v1` contract for backup jobs, repositories,
+  restore points, and storage targets.
+- Deterministic local Veeam-to-unified adapter with no Veeam API or network
+  access.
 
 ## Foundation Gate: Evidence contract and S3 source stability
 
@@ -52,9 +57,11 @@ malformed evidence is not presented as a confirmed security failure.
 - Define a versioned Unified Resilience Report Schema.
 - Map the versioned S3 Security Report v1 into the unified schema with a
   deterministic local adapter.
-- Implement a Veeam API read-only collector.
-- Produce example reports for backup jobs, repositories, restore points, and
-  storage targets.
+- Stabilize the mock-based Veeam Evidence Report v1 contract and deterministic
+  unified adapter.
+- Implement a real Veeam API read-only collector as a later step that builds on
+  the mock-stabilized evidence semantics and explicitly versions real-collection
+  metadata.
 - Map source evidence, collection timestamps, and confidence or completeness
   information into the unified schema.
 
