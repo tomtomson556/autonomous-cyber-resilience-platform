@@ -1,0 +1,60 @@
+{
+  "schema_version": "veeam-evidence-report/v1",
+  "timestamp": "2026-06-09T10:00:00+00:00",
+  "report_type": "veeam_evidence_report",
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "collector": {
+    "name": "mock_veeam_evidence_collector",
+    "mode": "mock_only"
+  },
+  "overall_status": "AT_RISK",
+  "backup_jobs": [
+    {
+      "job_id": "veeam-job-example-001",
+      "job_name": "Example Finance Backup",
+      "workload_type": "m365",
+      "repository_id": "veeam-repository-example-001",
+      "last_successful_backup": "2026-06-09T08:30:00+00:00",
+      "evidence": {
+        "status": "PASS",
+        "reason": "RecentSuccessfulBackup",
+        "message": "The mock backup job has a recent successful backup."
+      }
+    }
+  ],
+  "repositories": [
+    {
+      "repository_id": "veeam-repository-example-001",
+      "repository_name": "Example Backup Repository",
+      "storage_target_id": "veeam-storage-target-example-001",
+      "evidence": {
+        "status": "PASS",
+        "reason": "RepositoryAvailable",
+        "message": "The mock backup repository is available."
+      }
+    }
+  ],
+  "restore_points": [
+    {
+      "restore_point_id": "veeam-restore-point-example-001",
+      "job_id": "veeam-job-example-001",
+      "created_at": "2026-06-09T08:30:00+00:00",
+      "evidence": {
+        "status": "UNKNOWN",
+        "reason": "RestoreVerificationUnavailable",
+        "message": "The mock restore point has no restore-verification evidence."
+      }
+    }
+  ],
+  "storage_targets": [
+    {
+      "storage_target_id": "veeam-storage-target-example-001",
+      "target_type": "object_storage",
+      "evidence": {
+        "status": "FAIL",
+        "reason": "ImmutabilityNotConfirmed",
+        "message": "The mock storage target has no confirmed immutability evidence."
+      }
+    }
+  ]
+}

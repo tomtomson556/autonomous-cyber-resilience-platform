@@ -47,7 +47,10 @@ and a non-secret reference to the source report.
 Expected future evidence sources include:
 
 * AWS S3 security validator reports.
-* Veeam backup jobs, repositories, restore points, and storage targets.
+* Mock Veeam Evidence Report v1 data for backup jobs, repositories, restore
+  points, and storage targets.
+* Future real Veeam read-only collector reports that preserve the same Veeam
+  Evidence Report v1 semantics.
 * Microsoft 365 and hybrid workload metadata.
 * Restore-test evidence.
 * RPO and RTO evaluation results.
@@ -130,11 +133,14 @@ approval.
 
 ## Future Veeam Read-Only Collector Integration
 
-A future Veeam API read-only collector can populate backup-job, repository,
-restore-point, and storage-target evidence. The collector does not currently
-exist in this repository.
+The mock-only `veeam-evidence-report/v1` contract and local
+`veeam_unified_report_adapter` currently populate backup-job, repository,
+restore-point, and storage-target evidence without any Veeam API or network
+access.
 
-The collector should use least-privilege read-only permissions, preserve source
-timestamps and identifiers, avoid customer secrets in reports, and map missing
-or inaccessible evidence to `UNKNOWN` where the check remains independently
+A future real Veeam API read-only collector is a later step. It should build on
+the mock-stabilized evidence semantics, explicitly version real-collection
+metadata, use least-privilege read-only permissions, preserve source timestamps
+and identifiers, avoid customer secrets in reports, and map missing or
+inaccessible evidence to `UNKNOWN` where the evidence remains independently
 evaluable.
