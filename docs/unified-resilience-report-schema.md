@@ -21,14 +21,22 @@ before processing evidence.
 
 ## Relationship to Current S3 Security Reports
 
-The current AWS S3 security validator produces source-specific reports with
-structured check results containing `status`, `reason`, and `message`. A future
-adapter can map those reports into the unified report without changing the S3
-validator's authority over its rule-based results.
+The AWS S3 security validator produces source-specific reports with structured
+check results containing `status`, `reason`, and `message`. The local
+`s3_unified_report_adapter` maps versioned `s3-security-report/v1` reports into
+the unified report without changing the S3 validator's authority over its
+rule-based results.
 
 The unified report does not replace source reports. It references and correlates
 their evidence so that backup assets can be evaluated across storage,
 protection, recovery, and workload context.
+
+The adapter deterministically maps S3 `SECURE`, `INSECURE`, and `INCOMPLETE`
+overall statuses to unified `HEALTHY`, `AT_RISK`, and `INCOMPLETE` statuses. It
+also preserves the original S3 overall status and every check-level `PASS`,
+`FAIL`, and `UNKNOWN` result. It does not calculate risk scores or recommend
+actions; those asset fields remain `null` and `recommended_actions` remains
+empty.
 
 ## Evidence Sources
 
