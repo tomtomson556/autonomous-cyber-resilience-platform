@@ -50,6 +50,8 @@ malformed evidence is not presented as a confirmed security failure.
 ## Milestone 1: Unified resilience evidence and Veeam visibility
 
 - Define a versioned Unified Resilience Report Schema.
+- Map the versioned S3 Security Report v1 into the unified schema with a
+  deterministic local adapter.
 - Implement a Veeam API read-only collector.
 - Produce example reports for backup jobs, repositories, restore points, and
   storage targets.
