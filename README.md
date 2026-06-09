@@ -31,10 +31,10 @@ points, retention policies, IAM, Veeam or AWS configurations, or restore
 operations. Human approval and deterministic policy checks remain the final
 authorization authority for critical actions.
 
-The next technical stage is a Veeam API read-only collector and a Unified
-Resilience Report Schema. Controlled orchestration is a later milestone after
-deterministic rules, risk evaluation, runbook metadata, and approval workflows
-are established.
+The next technical stage is a Veeam API read-only collector that maps evidence
+into the Unified Resilience Report Schema. Controlled orchestration is a later
+milestone after deterministic rules, risk evaluation, runbook metadata, and
+approval workflows are established.
 
 ## Overview
 
@@ -362,28 +362,29 @@ Example JSON report:
 
 ```json
 {
+  "schema_version": "s3-security-report/v1",
   "timestamp": "2026-06-03T10:00:00+00:00",
   "bucket": "cyber-resilience-backup-lab-example",
   "checks": {
     "versioning": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "Bucket versioning is enabled."
     },
     "encryption": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "Bucket default encryption uses an approved algorithm."
     },
     "object_lock": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "S3 Object Lock is enabled."
     },
     "public_access_block": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "All Public Access Block settings are enabled."
     },
     "bucket_policy_not_public": {
       "status": "PASS",
@@ -393,12 +394,12 @@ Example JSON report:
     "secure_transport_policy": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "The bucket policy enforces secure transport."
     },
     "bucket_owner_enforced": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "Bucket owner enforced object ownership is configured."
     }
   },
   "overall_status": "SECURE"
@@ -561,7 +562,6 @@ This project follows core cloud security principles:
 The roadmap prioritizes evidence collection and deterministic resilience
 evaluation before AI assistance and controlled orchestration:
 
-* Stabilize the S3 evidence source and complete consistent `UNKNOWN` semantics.
 * Define a versioned Unified Resilience Report Schema.
 * Add a Veeam API read-only collector.
 * Add deterministic RPO/RTO evaluation, restore-test evidence, and risk scoring.

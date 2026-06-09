@@ -28,8 +28,13 @@ and controlled orchestration.
 - Structured check results with `status`, `reason`, and `message`.
 - Check-level `PASS`, `FAIL`, and `UNKNOWN` statuses and overall `SECURE`,
   `INSECURE`, and `INCOMPLETE` statuses.
+- Versioned `s3-security-report/v1` evidence contract with consistent
+  `UNKNOWN` semantics for inaccessible, incomplete, or malformed evidence.
 
 ## Foundation Gate: Evidence contract and S3 source stability
+
+Foundation Gate status: initial S3 evidence contract v1 stabilized with
+regression coverage.
 
 - Stabilize the S3 evidence source and its regression coverage.
 - Apply the documented `UNKNOWN` semantics consistently across all independently
@@ -38,10 +43,9 @@ and controlled orchestration.
 - Preserve rule-based validators as the authoritative source for `PASS`, `FAIL`,
   and `UNKNOWN`.
 
-The status model already defines `UNKNOWN` as missing or incomplete evidence.
-The migration is not yet complete across every validator check and
-`AccessDenied` path. Missing evidence must not be presented as a confirmed
-security failure.
+The S3 evidence source implements the status model across every validator check
+and individual `AccessDenied` path. Missing, inaccessible, incomplete, or
+malformed evidence is not presented as a confirmed security failure.
 
 ## Milestone 1: Unified resilience evidence and Veeam visibility
 
