@@ -21,6 +21,7 @@ load_dotenv()
 
 AWS_REGION = os.getenv("AWS_DEFAULT_REGION")
 REPORT_PATH = Path("reports/s3_security_report.json")
+SCHEMA_VERSION = "s3-security-report/v1"
 
 REQUIRED_ENV_VARS = [
     "AWS_DEFAULT_REGION",
@@ -97,15 +98,26 @@ def get_client_error_code(error: ClientError) -> str:
     return error.response.get("Error", {}).get("Code", "Unknown")
 
 
+def check_result(status: str, reason: str | None, message: str) -> dict:
+    return {
+        "status": status,
+        "reason": reason,
+        "message": message,
+    }
+
+
 def raise_for_critical_s3_error(error: ClientError, check_name: str) -> None:
     error_code = get_client_error_code(error)
 
     critical_errors = {
-        "AccessDenied",
         "AllAccessDisabled",
+        "ExpiredToken",
         "InvalidAccessKeyId",
+        "InvalidToken",
         "NoSuchBucket",
         "SignatureDoesNotMatch",
+        "TokenRefreshRequired",
+        "UnrecognizedClientException",
     }
 
     if error_code in critical_errors:
@@ -114,135 +126,278 @@ def raise_for_critical_s3_error(error: ClientError, check_name: str) -> None:
         ) from error
 
 
-def check_versioning(s3_client, bucket_name: str) -> bool:
+def unknown_aws_error(error_code: str, check_name: str) -> dict:
+    LOGGER.warning("%s check failed with AWS error: %s", check_name, error_code)
+    return check_result(
+        "UNKNOWN",
+        error_code,
+        f"The {check_name} check could not be evaluated.",
+    )
+
+
+def check_versioning(s3_client, bucket_name: str) -> dict:
     try:
         response = s3_client.get_bucket_versioning(Bucket=bucket_name)
-        return response.get("Status") == "Enabled"
+        if not isinstance(response, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The bucket versioning response is malformed.",
+            )
+
+        status = response.get("Status")
+
+        if status == "Enabled":
+            return check_result("PASS", None, "Bucket versioning is enabled.")
+
+        if status in {None, "Suspended"}:
+            return check_result(
+                "FAIL",
+                "VersioningNotEnabled",
+                "Bucket versioning is not enabled.",
+            )
+
+        return check_result(
+            "UNKNOWN",
+            "UnexpectedVersioningStatus",
+            "The bucket versioning status could not be interpreted.",
+        )
     except ClientError as error:
         raise_for_critical_s3_error(error, "versioning")
-        LOGGER.warning(
-            "Versioning check failed with AWS error: %s",
-            get_client_error_code(error),
-        )
-        return False
+        return unknown_aws_error(get_client_error_code(error), "versioning")
 
 
-def check_encryption(s3_client, bucket_name: str) -> bool:
+def check_encryption(s3_client, bucket_name: str) -> dict:
     try:
         response = s3_client.get_bucket_encryption(Bucket=bucket_name)
-        rules = response.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
+        if not isinstance(response, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The bucket encryption response is malformed.",
+            )
+
+        configuration = response.get("ServerSideEncryptionConfiguration")
+        if not isinstance(configuration, dict):
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The bucket encryption response is incomplete.",
+            )
+
+        rules = configuration.get("Rules")
         approved_algorithms = {"AES256", "aws:kms", "aws:kms:dsse"}
 
-        return any(
-            rule.get("ApplyServerSideEncryptionByDefault", {}).get("SSEAlgorithm")
-            in approved_algorithms
-            for rule in rules
+        if not isinstance(rules, list) or not rules:
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The bucket encryption response is incomplete.",
+            )
+
+        algorithms = []
+        for rule in rules:
+            if not isinstance(rule, dict):
+                return check_result(
+                    "UNKNOWN",
+                    "MalformedResponse",
+                    "The bucket encryption response is malformed.",
+                )
+
+            default_encryption = rule.get("ApplyServerSideEncryptionByDefault")
+            if not isinstance(default_encryption, dict) or not isinstance(
+                default_encryption.get("SSEAlgorithm"), str
+            ):
+                return check_result(
+                    "UNKNOWN",
+                    "MalformedResponse",
+                    "The bucket encryption response is malformed.",
+                )
+
+            algorithms.append(default_encryption["SSEAlgorithm"])
+
+        if any(algorithm in approved_algorithms for algorithm in algorithms):
+            return check_result(
+                "PASS",
+                None,
+                "Bucket default encryption uses an approved algorithm.",
+            )
+
+        return check_result(
+            "FAIL",
+            "ApprovedEncryptionNotConfigured",
+            "Bucket default encryption does not use an approved algorithm.",
         )
     except ClientError as error:
         error_code = get_client_error_code(error)
 
         if error_code == "ServerSideEncryptionConfigurationNotFoundError":
-            return False
+            return check_result(
+                "FAIL",
+                error_code,
+                "Bucket default encryption is not configured.",
+            )
 
         raise_for_critical_s3_error(error, "encryption")
-        LOGGER.warning("Encryption check failed with AWS error: %s", error_code)
-        return False
+        return unknown_aws_error(error_code, "encryption")
 
 
-def check_object_lock(s3_client, bucket_name: str) -> bool:
+def check_object_lock(s3_client, bucket_name: str) -> dict:
     try:
         response = s3_client.get_object_lock_configuration(Bucket=bucket_name)
-        configuration = response.get("ObjectLockConfiguration", {})
-        return configuration.get("ObjectLockEnabled") == "Enabled"
+        if not isinstance(response, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The S3 Object Lock response is malformed.",
+            )
+
+        configuration = response.get("ObjectLockConfiguration")
+        if not isinstance(configuration, dict):
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The S3 Object Lock response is incomplete.",
+            )
+
+        status = configuration.get("ObjectLockEnabled")
+
+        if status == "Enabled":
+            return check_result("PASS", None, "S3 Object Lock is enabled.")
+
+        if status is None:
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The S3 Object Lock response is incomplete.",
+            )
+
+        return check_result(
+            "UNKNOWN",
+            "UnexpectedObjectLockStatus",
+            "The S3 Object Lock status could not be interpreted.",
+        )
     except ClientError as error:
         error_code = get_client_error_code(error)
 
         if error_code == "ObjectLockConfigurationNotFoundError":
-            return False
+            return check_result(
+                "FAIL",
+                error_code,
+                "S3 Object Lock is not configured.",
+            )
 
         raise_for_critical_s3_error(error, "object_lock")
-        LOGGER.warning("Object Lock check failed with AWS error: %s", error_code)
-        return False
+        return unknown_aws_error(error_code, "object_lock")
 
 
-def check_public_access_block(s3_client, bucket_name: str) -> bool:
+def check_public_access_block(s3_client, bucket_name: str) -> dict:
     try:
         response = s3_client.get_public_access_block(Bucket=bucket_name)
-        config = response.get("PublicAccessBlockConfiguration", {})
+        if not isinstance(response, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The Public Access Block response is malformed.",
+            )
+
+        config = response.get("PublicAccessBlockConfiguration")
         required_settings = [
             "BlockPublicAcls",
             "IgnorePublicAcls",
             "BlockPublicPolicy",
             "RestrictPublicBuckets",
         ]
-        return all(config.get(setting) is True for setting in required_settings)
+
+        if not isinstance(config, dict) or any(
+            setting not in config for setting in required_settings
+        ):
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The Public Access Block response is incomplete.",
+            )
+
+        if any(not isinstance(config[setting], bool) for setting in required_settings):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The Public Access Block response is malformed.",
+            )
+
+        if all(config[setting] is True for setting in required_settings):
+            return check_result(
+                "PASS",
+                None,
+                "All Public Access Block settings are enabled.",
+            )
+
+        return check_result(
+            "FAIL",
+            "PublicAccessBlockNotFullyEnabled",
+            "One or more Public Access Block settings are not enabled.",
+        )
     except ClientError as error:
         error_code = get_client_error_code(error)
 
         if error_code == "NoSuchPublicAccessBlockConfiguration":
-            return False
+            return check_result(
+                "FAIL",
+                error_code,
+                "Public Access Block is not configured.",
+            )
 
         raise_for_critical_s3_error(error, "public_access_block")
-        LOGGER.warning(
-            "Public Access Block check failed with AWS error: %s",
-            error_code,
-        )
-        return False
+        return unknown_aws_error(error_code, "public_access_block")
 
 
 def check_bucket_policy_not_public(s3_client, bucket_name: str) -> dict:
     try:
         response = s3_client.get_bucket_policy_status(Bucket=bucket_name)
-        is_public = response.get("PolicyStatus", {}).get("IsPublic")
+        if not isinstance(response, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The bucket policy status response is malformed.",
+            )
+
+        policy_status = response.get("PolicyStatus")
+        if not isinstance(policy_status, dict):
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The bucket policy status response is incomplete.",
+            )
+
+        is_public = policy_status.get("IsPublic")
 
         if is_public is False:
-            return {
-                "status": "PASS",
-                "reason": None,
-                "message": "The bucket policy is not public.",
-            }
+            return check_result("PASS", None, "The bucket policy is not public.")
 
         if is_public is True:
-            return {
-                "status": "FAIL",
-                "reason": None,
-                "message": "The bucket policy is public.",
-            }
+            return check_result(
+                "FAIL",
+                "BucketPolicyIsPublic",
+                "The bucket policy is public.",
+            )
 
-        return {
-            "status": "UNKNOWN",
-            "reason": "IncompleteResponse",
-            "message": "The bucket policy status response is incomplete.",
-        }
+        return check_result(
+            "UNKNOWN",
+            "IncompleteResponse",
+            "The bucket policy status response is incomplete.",
+        )
     except ClientError as error:
         error_code = get_client_error_code(error)
 
         if error_code == "NoSuchBucketPolicy":
-            return {
-                "status": "PASS",
-                "reason": "NoSuchBucketPolicy",
-                "message": "The bucket has no bucket policy that could be public.",
-            }
-
-        if error_code == "AccessDenied":
-            LOGGER.warning(
-                "Bucket policy status check could not be completed due to AccessDenied."
+            return check_result(
+                "PASS",
+                error_code,
+                "The bucket has no bucket policy that could be public.",
             )
-            return {
-                "status": "UNKNOWN",
-                "reason": "AccessDenied",
-                "message": "The bucket policy status could not be evaluated.",
-            }
 
         raise_for_critical_s3_error(error, "bucket_policy_not_public")
-        LOGGER.warning(
-            "Bucket policy status check failed with AWS error: %s", error_code
-        )
-        return {
-            "status": "UNKNOWN",
-            "reason": error_code,
-            "message": "The bucket policy status could not be evaluated.",
-        }
+        return unknown_aws_error(error_code, "bucket_policy_not_public")
 
 
 def _as_list(value):
@@ -298,93 +453,219 @@ def _principal_covers_everyone(principal) -> bool:
     return False
 
 
-def check_secure_transport_policy(s3_client, bucket_name: str) -> bool:
-    try:
-        response = s3_client.get_bucket_policy(Bucket=bucket_name)
-        policy = json.loads(response.get("Policy", "{}"))
-    except ClientError as error:
-        error_code = get_client_error_code(error)
+def _is_string_or_string_list(value) -> bool:
+    return isinstance(value, str) or (
+        isinstance(value, list) and all(isinstance(item, str) for item in value)
+    )
 
-        if error_code == "NoSuchBucketPolicy":
-            return False
 
-        if error_code == "AccessDenied":
-            LOGGER.warning(
-                "Secure transport policy check could not be completed due to AccessDenied."
-            )
-            return False
+def _policy_statement_is_malformed(statement: dict) -> bool:
+    if statement.get("Effect") not in {"Allow", "Deny"}:
+        return True
 
-        raise_for_critical_s3_error(error, "secure_transport_policy")
-        LOGGER.warning("Bucket policy check failed with AWS error: %s", error_code)
-        return False
-    except json.JSONDecodeError:
-        LOGGER.warning(
-            "Bucket policy check failed because the policy is not valid JSON."
-        )
-        return False
-
-    for statement in _as_list(policy.get("Statement")):
-        if not isinstance(statement, dict):
-            continue
-
-        if statement.get("Effect") != "Deny":
-            continue
-
-        if not _action_covers_s3(statement.get("Action")):
-            continue
-
-        if not _resource_covers_bucket(statement.get("Resource"), bucket_name):
-            continue
-
-        if not _principal_covers_everyone(statement.get("Principal")):
-            continue
-
-        if _condition_has_secure_transport_false(statement.get("Condition", {})):
+    for field_pair in (("Action", "NotAction"), ("Resource", "NotResource")):
+        present_fields = [field for field in field_pair if field in statement]
+        if len(present_fields) != 1 or not _is_string_or_string_list(
+            statement[present_fields[0]]
+        ):
             return True
+
+    principal_fields = [
+        field for field in ("Principal", "NotPrincipal") if field in statement
+    ]
+    if len(principal_fields) != 1:
+        return True
+
+    principal = statement[principal_fields[0]]
+    if isinstance(principal, dict):
+        if not principal or any(
+            not _is_string_or_string_list(value) for value in principal.values()
+        ):
+            return True
+    elif not isinstance(principal, str):
+        return True
+
+    condition = statement.get("Condition")
+    if condition is not None and (
+        not isinstance(condition, dict)
+        or any(
+            not isinstance(operator, str) or not isinstance(values, dict)
+            for operator, values in condition.items()
+        )
+    ):
+        return True
 
     return False
 
 
-def check_bucket_owner_enforced(s3_client, bucket_name: str) -> bool:
+def check_secure_transport_policy(s3_client, bucket_name: str) -> dict:
+    try:
+        response = s3_client.get_bucket_policy(Bucket=bucket_name)
+        if not isinstance(response, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The bucket policy response is malformed.",
+            )
+
+        policy_document = response.get("Policy")
+
+        if not isinstance(policy_document, str):
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The bucket policy response is incomplete.",
+            )
+
+        policy = json.loads(policy_document)
+    except ClientError as error:
+        error_code = get_client_error_code(error)
+
+        if error_code == "NoSuchBucketPolicy":
+            return check_result(
+                "FAIL",
+                error_code,
+                "The bucket has no policy enforcing secure transport.",
+            )
+
+        raise_for_critical_s3_error(error, "secure_transport_policy")
+        return unknown_aws_error(error_code, "secure_transport_policy")
+    except json.JSONDecodeError:
+        return check_result(
+            "UNKNOWN",
+            "MalformedPolicy",
+            "The bucket policy is not valid JSON.",
+        )
+
+    if not isinstance(policy, dict) or not isinstance(
+        policy.get("Statement"), (dict, list)
+    ):
+        return check_result(
+            "UNKNOWN",
+            "MalformedPolicy",
+            "The bucket policy structure could not be interpreted.",
+        )
+
+    for statement in _as_list(policy.get("Statement")):
+        if not isinstance(statement, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedPolicy",
+                "The bucket policy structure could not be interpreted.",
+            )
+
+        if _policy_statement_is_malformed(statement):
+            return check_result(
+                "UNKNOWN",
+                "MalformedPolicy",
+                "The bucket policy structure could not be interpreted.",
+            )
+
+        try:
+            if statement.get("Effect") != "Deny":
+                continue
+
+            if not _action_covers_s3(statement.get("Action")):
+                continue
+
+            if not _resource_covers_bucket(statement.get("Resource"), bucket_name):
+                continue
+
+            if not _principal_covers_everyone(statement.get("Principal")):
+                continue
+
+            if _condition_has_secure_transport_false(statement.get("Condition", {})):
+                return check_result(
+                    "PASS",
+                    None,
+                    "The bucket policy enforces secure transport.",
+                )
+        except (AttributeError, TypeError):
+            return check_result(
+                "UNKNOWN",
+                "MalformedPolicy",
+                "The bucket policy structure could not be interpreted.",
+            )
+
+    return check_result(
+        "FAIL",
+        "SecureTransportNotEnforced",
+        "The bucket policy does not enforce secure transport.",
+    )
+
+
+def check_bucket_owner_enforced(s3_client, bucket_name: str) -> dict:
     try:
         response = s3_client.get_bucket_ownership_controls(Bucket=bucket_name)
-        rules = response.get("OwnershipControls", {}).get("Rules", [])
-        return any(
-            rule.get("ObjectOwnership") == "BucketOwnerEnforced" for rule in rules
+        if not isinstance(response, dict):
+            return check_result(
+                "UNKNOWN",
+                "MalformedResponse",
+                "The bucket ownership controls response is malformed.",
+            )
+
+        ownership_controls = response.get("OwnershipControls")
+        if not isinstance(ownership_controls, dict):
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The bucket ownership controls response is incomplete.",
+            )
+
+        rules = ownership_controls.get("Rules")
+
+        if not isinstance(rules, list) or not rules:
+            return check_result(
+                "UNKNOWN",
+                "IncompleteResponse",
+                "The bucket ownership controls response is incomplete.",
+            )
+
+        ownership_values = []
+        for rule in rules:
+            if not isinstance(rule, dict) or not isinstance(
+                rule.get("ObjectOwnership"), str
+            ):
+                return check_result(
+                    "UNKNOWN",
+                    "MalformedResponse",
+                    "The bucket ownership controls response is malformed.",
+                )
+
+            ownership_values.append(rule["ObjectOwnership"])
+
+        if "BucketOwnerEnforced" in ownership_values:
+            return check_result(
+                "PASS",
+                None,
+                "Bucket owner enforced object ownership is configured.",
+            )
+
+        known_ownership_values = {"BucketOwnerPreferred", "ObjectWriter"}
+        if any(value not in known_ownership_values for value in ownership_values):
+            return check_result(
+                "UNKNOWN",
+                "UnexpectedObjectOwnership",
+                "The bucket object ownership value could not be interpreted.",
+            )
+
+        return check_result(
+            "FAIL",
+            "BucketOwnerEnforcedNotConfigured",
+            "Bucket owner enforced object ownership is not configured.",
         )
     except ClientError as error:
         error_code = get_client_error_code(error)
 
         if error_code == "OwnershipControlsNotFoundError":
-            return False
-
-        if error_code == "AccessDenied":
-            LOGGER.warning(
-                "Bucket ownership controls check could not be completed due to AccessDenied."
+            return check_result(
+                "FAIL",
+                error_code,
+                "Bucket ownership controls are not configured.",
             )
-            return False
 
         raise_for_critical_s3_error(error, "bucket_owner_enforced")
-        LOGGER.warning("Ownership controls check failed with AWS error: %s", error_code)
-        return False
-
-
-def _normalize_check_result(result) -> dict:
-    if isinstance(result, dict):
-        return result
-
-    if result:
-        return {
-            "status": "PASS",
-            "reason": None,
-            "message": "The check passed.",
-        }
-
-    return {
-        "status": "FAIL",
-        "reason": None,
-        "message": "The check failed.",
-    }
+        return unknown_aws_error(error_code, "bucket_owner_enforced")
 
 
 def build_report(s3_client, bucket_name: str) -> dict:
@@ -404,17 +685,14 @@ def build_report(s3_client, bucket_name: str) -> dict:
         "bucket_owner_enforced": check_bucket_owner_enforced(s3_client, bucket_name),
     }
 
-    report_checks = {
-        check_name: _normalize_check_result(result)
-        for check_name, result in checks.items()
-    }
-    check_statuses = [result["status"] for result in report_checks.values()]
+    check_statuses = [result["status"] for result in checks.values()]
     overall_status = calculate_overall_status(check_statuses)
 
     return {
+        "schema_version": SCHEMA_VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "bucket": bucket_name,
-        "checks": report_checks,
+        "checks": checks,
         "overall_status": overall_status,
     }
 

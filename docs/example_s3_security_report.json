@@ -1,26 +1,27 @@
 {
+  "schema_version": "s3-security-report/v1",
   "timestamp": "2026-06-03T10:00:00+00:00",
   "bucket": "cyber-resilience-backup-lab-example",
   "checks": {
     "versioning": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "Bucket versioning is enabled."
     },
     "encryption": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "Bucket default encryption uses an approved algorithm."
     },
     "object_lock": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "S3 Object Lock is enabled."
     },
     "public_access_block": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "All Public Access Block settings are enabled."
     },
     "bucket_policy_not_public": {
       "status": "PASS",
@@ -30,12 +31,12 @@
     "secure_transport_policy": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "The bucket policy enforces secure transport."
     },
     "bucket_owner_enforced": {
       "status": "PASS",
       "reason": null,
-      "message": "The check passed."
+      "message": "Bucket owner enforced object ownership is configured."
     }
   },
   "overall_status": "SECURE"
