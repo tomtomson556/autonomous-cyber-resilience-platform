@@ -118,9 +118,10 @@ Automated validation of:
 
 The project includes a deterministic Veeam Evidence Report v1 contract, a
 shipped `mock_only` example, and a local mock-only adapter into the Unified
-Resilience Report Schema. The contract reserves an `api_read_only` profile with
-explicit future safety boundaries, but no real Veeam network collector exists
-yet and the adapter rejects that profile.
+Resilience Report Schema. A network-free `api_read_only` collector groundwork
+uses an injectable fakeable transport and accepts only four exact allowlisted
+GET requests. It has no productive HTTP implementation, and the Unified
+Resilience Report adapter rejects that profile.
 
 The mock contract covers:
 

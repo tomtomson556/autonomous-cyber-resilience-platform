@@ -119,31 +119,40 @@ The adapter preserves status, reason, message, collection timestamp, source
 schema version, mock collector identity, and evidence origin. It performs no
 risk scoring and creates no recommendations or actions.
 
-## Future API Safety Boundary
+## Network-Free Read-Only Collector Groundwork
 
-A real Veeam read-only collector is a later step. Its transport must enforce
-the safety boundary independently of the permissions assigned to its Veeam
-account:
+The current `api_read_only` collector is network-free groundwork with an
+injectable transport interface. It contains no productive HTTP,
+authentication, TLS, credential, or session implementation. Tests use only a
+fake transport and sanitized fake responses.
 
-* Allow `POST` only for authentication through `/sessionMngr/`.
-* Allow only explicitly allowlisted `GET` evidence endpoints.
-* Hard-block every other `POST`, `PUT`, `PATCH`, and `DELETE` request.
-* Hard-block restore, start, stop, retry, delete, action, and mutation paths.
-* Keep TLS certificate verification enabled by default.
-* Read secrets only from environment variables or runtime secret providers.
-* Never store, log, document, or emit secrets, tokens, credentials, internal
-  URLs, or raw API response dumps.
-* Map API errors and missing permissions to `UNKNOWN`, never automatically to
-  `FAIL`.
-
-The initial future evidence allowlist may consider only:
+The collector accepts exactly these requests:
 
 * `GET /backups`
-* `GET /query?type=Repository`
+* `GET /backupSessions`
 * `GET /restorePoints`
+* `GET /query?type=Repository`
 
-`backup_jobs` are deferred because `GET /jobs` requires the Portal
-Administrator role and cannot be assumed safely available to a low-privilege
-collector. `storage_targets` are deferred until a reliable mapping is defined.
-For `api_read_only` evidence, both collections must remain empty or explicitly
-`UNKNOWN` until a later change proves a safe mapping.
+Every other method, path, or query combination is blocked before the transport
+is called. This includes all restore, start, stop, retry, delete, action, and
+mutation paths. `GET /jobs` is deliberately not allowed.
+
+The collector produces only `veeam-evidence-report/v1` with the
+`api_read_only` profile. It does not call the Unified Resilience Report adapter,
+and that adapter continues to reject `api_read_only` reports.
+
+`backup_jobs` and `storage_targets` remain empty in this step. Sessions are not
+emitted as v1 resources. Repository and restore-point entries are emitted only
+when every required identifier and relationship is present in the sanitized
+response. Incomplete entries are omitted rather than completed with invented
+values, and the report remains `INCOMPLETE`. Read-only observations are
+represented as `UNKNOWN`; their presence alone does not prove a resilience
+condition.
+
+## Future Network Integration Boundary
+
+A future productive client must preserve the strict allowlist, keep TLS
+certificate verification enabled by default, read secrets only from runtime
+secret providers, and never emit secrets, internal endpoints, or raw API
+responses. Authentication and any expansion of the endpoint allowlist require
+a separate explicit design decision and review.
