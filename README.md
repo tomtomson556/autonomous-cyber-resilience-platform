@@ -114,10 +114,13 @@ Automated validation of:
 * Short-lived AWS credentials through GitHub Actions OIDC
 * Machine-readable JSON security report output
 
-### Mock Veeam Evidence Contract
+### Veeam Evidence Contract
 
-The project includes a deterministic mock-only Veeam Evidence Report v1
-contract and a local adapter into the Unified Resilience Report Schema.
+The project includes a deterministic Veeam Evidence Report v1 contract, a
+shipped `mock_only` example, and a local mock-only adapter into the Unified
+Resilience Report Schema. The contract reserves an `api_read_only` profile with
+explicit future safety boundaries, but no real Veeam network collector exists
+yet and the adapter rejects that profile.
 
 The mock contract covers:
 

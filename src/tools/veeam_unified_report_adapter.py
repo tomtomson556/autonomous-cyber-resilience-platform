@@ -1,8 +1,11 @@
+from src.tools.veeam_evidence_contract import MOCK_COLLECTOR_NAME
+from src.tools.veeam_evidence_contract import validate_veeam_collector_profile
+
+
 VEEAM_SCHEMA_VERSION = "veeam-evidence-report/v1"
 UNIFIED_SCHEMA_VERSION = "1.0.0"
 PLATFORM_NAME = "autonomous-cyber-resilience-platform"
 ADAPTER_NAME = "veeam_unified_report_adapter"
-MOCK_COLLECTOR_NAME = "mock_veeam_evidence_collector"
 
 VALID_EVIDENCE_STATUSES = frozenset({"PASS", "FAIL", "UNKNOWN"})
 VALID_OVERALL_STATUSES = frozenset({"HEALTHY", "AT_RISK", "INCOMPLETE"})
@@ -135,15 +138,10 @@ def _validate_veeam_report(report) -> tuple[str, str, list[tuple[str, str, str, 
     timestamp = _require_non_empty_string(report.get("timestamp"), "timestamp")
     if report.get("report_type") != "veeam_evidence_report":
         raise ValueError("Veeam report_type must be 'veeam_evidence_report'.")
-    if report.get("data_classification") != "MOCK_EXAMPLE_ONLY":
-        raise ValueError("Veeam Evidence Contract v1 accepts mock example data only.")
 
-    collector = report.get("collector")
-    if not isinstance(collector, dict) or collector != {
-        "name": MOCK_COLLECTOR_NAME,
-        "mode": "mock_only",
-    }:
-        raise ValueError("Veeam Evidence Contract v1 requires the mock-only collector.")
+    collector_mode = validate_veeam_collector_profile(report)
+    if collector_mode != "mock_only":
+        raise ValueError("Unified Veeam adapter accepts mock_only evidence only.")
 
     resources = _validate_resources(report)
     evidence_statuses = {

@@ -133,10 +133,11 @@ approval.
 
 ## Future Veeam Read-Only Collector Integration
 
-The mock-only `veeam-evidence-report/v1` contract and local
+The `mock_only` profile of `veeam-evidence-report/v1` and local
 `veeam_unified_report_adapter` currently populate backup-job, repository,
 restore-point, and storage-target evidence without any Veeam API or network
-access.
+access. The contract-level `api_read_only` profile is intentionally rejected by
+the adapter until a later explicit adapter policy is reviewed and implemented.
 
 A future real Veeam API read-only collector is a later step. It should build on
 the mock-stabilized evidence semantics, explicitly version real-collection
