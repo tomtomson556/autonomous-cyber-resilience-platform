@@ -63,8 +63,11 @@ malformed evidence is not presented as a confirmed security failure.
   `veeam-evidence-report/v1`.
 - Implement network-free Veeam Enterprise Manager collector groundwork with
   fake-response tests and an enforced method and endpoint allowlist.
+- Add a pre-transport API-contract fixture and conservative mapping step using
+  sanitized Veeam Enterprise Manager resource patterns.
 - Later add a separately reviewed productive read-only transport without
-  weakening the allowlist.
+  weakening the reviewed safety boundary. Real authentication, logon,
+  session-manager, TLS, and certificate handling remain future work.
 - Later decide an explicit Unified Resilience Report adapter policy for
   `api_read_only` evidence.
 - Preserve the no-write, no-restore, and no-direct-API-to-unified-report

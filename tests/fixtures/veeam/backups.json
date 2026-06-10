@@ -1,0 +1,28 @@
+{
+  "Entities": {
+    "Backups": {
+      "Backup": [
+        {
+          "UID": "urn:veeam:Backup:backup-fixture-001",
+          "Name": "Sanitized Backup",
+          "Type": "Backup",
+          "Href": "/api/backups/backup-fixture-001",
+          "JobUid": "urn:veeam:Job:job-fixture-001",
+          "JobName": "Sanitized Backup Job",
+          "RepositoryUid": "urn:veeam:Repository:repository-fixture-001",
+          "Platform": "VMware",
+          "Links": {
+            "Link": [
+              {
+                "Rel": "Up",
+                "Type": "RepositoryReference",
+                "Href": "/api/repositories/repository-fixture-001",
+                "Name": "Sanitized Repository"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

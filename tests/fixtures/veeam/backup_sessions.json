@@ -1,0 +1,30 @@
+{
+  "Entities": {
+    "BackupJobSessions": {
+      "BackupJobSession": [
+        {
+          "UID": "urn:veeam:BackupJobSession:session-fixture-001",
+          "Name": "Sanitized Backup Job execution",
+          "Type": "BackupJobSession",
+          "Href": "/api/backupSessions/session-fixture-001",
+          "JobUid": "urn:veeam:Job:job-fixture-001",
+          "JobName": "Sanitized Backup Job",
+          "JobType": "Backup",
+          "State": "Stopped",
+          "Result": "Success",
+          "EndTime": "2026-06-10T09:00:00+00:00",
+          "Links": {
+            "Link": [
+              {
+                "Rel": "Up",
+                "Type": "JobReference",
+                "Href": "/api/jobs/job-fixture-001",
+                "Name": "Sanitized Backup Job"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
