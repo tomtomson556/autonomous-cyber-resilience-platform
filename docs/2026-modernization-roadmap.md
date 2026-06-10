@@ -31,8 +31,8 @@ and controlled orchestration.
 - Versioned `s3-security-report/v1` evidence contract with consistent
   `UNKNOWN` semantics for inaccessible, incomplete, or malformed evidence.
 - Deterministic local S3-to-unified adapter.
-- Mock-only `veeam-evidence-report/v1` contract for backup jobs, repositories,
-  restore points, and storage targets.
+- `veeam-evidence-report/v1` contract with a shipped `mock_only` example and a
+  reserved, non-networking `api_read_only` collector profile.
 - Deterministic local Veeam-to-unified adapter with no Veeam API or network
   access.
 
@@ -59,9 +59,14 @@ malformed evidence is not presented as a confirmed security failure.
   deterministic local adapter.
 - Stabilize the mock-based Veeam Evidence Report v1 contract and deterministic
   unified adapter.
-- Implement a real Veeam API read-only collector as a later step that builds on
-  the mock-stabilized evidence semantics and explicitly versions real-collection
-  metadata.
+- Define the `api_read_only` collector profile and safety boundary in
+  `veeam-evidence-report/v1`.
+- Later implement a minimal Veeam Enterprise Manager read-only collector with
+  fake-response tests and an enforced method and endpoint allowlist.
+- Later decide an explicit Unified Resilience Report adapter policy for
+  `api_read_only` evidence.
+- Preserve the no-write, no-restore, and no-direct-API-to-unified-report
+  boundary throughout these steps.
 - Map source evidence, collection timestamps, and confidence or completeness
   information into the unified schema.
 

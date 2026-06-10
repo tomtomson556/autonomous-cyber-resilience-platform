@@ -123,9 +123,21 @@ def test_unsupported_schema_version_is_rejected():
 
 def test_non_mock_collector_is_rejected():
     report = load_veeam_example_report()
+    report["data_classification"] = "SANITIZED_OPERATIONAL_EVIDENCE"
+    report["collector"] = {
+        "name": "veeam_enterprise_manager_read_only_collector",
+        "mode": "api_read_only",
+    }
+
+    with pytest.raises(ValueError, match="accepts mock_only evidence only"):
+        adapt_veeam_report_to_unified(report)
+
+
+def test_invalid_collector_mode_is_rejected():
+    report = load_veeam_example_report()
     report["collector"]["mode"] = "api"
 
-    with pytest.raises(ValueError, match="requires the mock-only collector"):
+    with pytest.raises(ValueError, match="Unsupported Veeam collector mode"):
         adapt_veeam_report_to_unified(report)
 
 

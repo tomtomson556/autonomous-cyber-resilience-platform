@@ -2,10 +2,10 @@
 
 ## Purpose
 
-The Veeam Evidence Report v1 contract defines deterministic, mock-only evidence
-for backup jobs, repositories, restore points, and storage targets. It proves
-the source contract and Unified Resilience Report mapping before any real Veeam
-API collector is implemented.
+The Veeam Evidence Report v1 contract defines deterministic evidence for backup
+jobs, repositories, restore points, and storage targets. The shipped example
+and current Unified Resilience Report mapping remain mock-only. The contract
+also reserves an explicit `api_read_only` profile for a later real collector.
 
 The schema version is:
 
@@ -13,8 +13,8 @@ The schema version is:
 veeam-evidence-report/v1
 ```
 
-This contract contains no credentials, endpoints, SDK clients, network calls,
-or production-changing behavior.
+The current implementation contains no credentials, endpoints, SDK clients,
+network calls, or production-changing behavior.
 
 ## Report Shape
 
@@ -31,7 +31,43 @@ Every report contains:
 * `restore_points`
 * `storage_targets`
 
-The mock collector metadata must identify `mode` as `mock_only`.
+## Collector Profiles
+
+The contract recognizes exactly two collector modes:
+
+* `mock_only`
+* `api_read_only`
+
+The shipped example uses the current default `mock_only` profile:
+
+```json
+{
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "collector": {
+    "name": "mock_veeam_evidence_collector",
+    "mode": "mock_only"
+  }
+}
+```
+
+The reserved `api_read_only` profile identifies sanitized operational evidence
+that a future collector may obtain from Veeam Backup Enterprise Manager REST
+API read endpoints:
+
+```json
+{
+  "data_classification": "SANITIZED_OPERATIONAL_EVIDENCE",
+  "collector": {
+    "name": "veeam_enterprise_manager_read_only_collector",
+    "mode": "api_read_only"
+  }
+}
+```
+
+`api_read_only` reports are not mock data. They must not contain secrets,
+tokens, internal URLs, credentials, or raw API response dumps. The current
+Unified Resilience Report adapter rejects this profile until a later explicit
+adapter policy is reviewed and implemented.
 
 ## Resource Collections
 
@@ -59,8 +95,8 @@ Each resource contains a structured `evidence` result:
 }
 ```
 
-* `PASS` means the available mock evidence confirms the expected condition.
-* `FAIL` means the available mock evidence confirms a negative condition.
+* `PASS` means the available evidence confirms the expected condition.
+* `FAIL` means the available evidence confirms a negative condition.
 * `UNKNOWN` means the evidence is incomplete or not trustworthy enough to
   decide.
 
@@ -74,17 +110,40 @@ The deterministic overall status is:
 
 ## Unified Report Adapter
 
-The local `veeam_unified_report_adapter` accepts only
-`veeam-evidence-report/v1`. It maps every Veeam evidence resource to a Unified
-Resilience Report asset and creates findings for `FAIL` and `UNKNOWN` evidence.
+The local `veeam_unified_report_adapter` accepts only the `mock_only` profile of
+`veeam-evidence-report/v1`. It maps every mock Veeam evidence resource to a
+Unified Resilience Report asset and creates findings for `FAIL` and `UNKNOWN`
+evidence.
 
 The adapter preserves status, reason, message, collection timestamp, source
 schema version, mock collector identity, and evidence origin. It performs no
 risk scoring and creates no recommendations or actions.
 
-## Real Collector Boundary
+## Future API Safety Boundary
 
-A real Veeam read-only collector is a later step. It should build on these
-stabilized status semantics and explicitly version real-collection metadata.
-Real API access, credentials, endpoints, and authentication are intentionally
-outside the v1 mock contract.
+A real Veeam read-only collector is a later step. Its transport must enforce
+the safety boundary independently of the permissions assigned to its Veeam
+account:
+
+* Allow `POST` only for authentication through `/sessionMngr/`.
+* Allow only explicitly allowlisted `GET` evidence endpoints.
+* Hard-block every other `POST`, `PUT`, `PATCH`, and `DELETE` request.
+* Hard-block restore, start, stop, retry, delete, action, and mutation paths.
+* Keep TLS certificate verification enabled by default.
+* Read secrets only from environment variables or runtime secret providers.
+* Never store, log, document, or emit secrets, tokens, credentials, internal
+  URLs, or raw API response dumps.
+* Map API errors and missing permissions to `UNKNOWN`, never automatically to
+  `FAIL`.
+
+The initial future evidence allowlist may consider only:
+
+* `GET /backups`
+* `GET /query?type=Repository`
+* `GET /restorePoints`
+
+`backup_jobs` are deferred because `GET /jobs` requires the Portal
+Administrator role and cannot be assumed safely available to a low-privilege
+collector. `storage_targets` are deferred until a reliable mapping is defined.
+For `api_read_only` evidence, both collections must remain empty or explicitly
+`UNKNOWN` until a later change proves a safe mapping.
