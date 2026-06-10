@@ -61,8 +61,10 @@ malformed evidence is not presented as a confirmed security failure.
   unified adapter.
 - Define the `api_read_only` collector profile and safety boundary in
   `veeam-evidence-report/v1`.
-- Later implement a minimal Veeam Enterprise Manager read-only collector with
+- Implement network-free Veeam Enterprise Manager collector groundwork with
   fake-response tests and an enforced method and endpoint allowlist.
+- Later add a separately reviewed productive read-only transport without
+  weakening the allowlist.
 - Later decide an explicit Unified Resilience Report adapter policy for
   `api_read_only` evidence.
 - Preserve the no-write, no-restore, and no-direct-API-to-unified-report
