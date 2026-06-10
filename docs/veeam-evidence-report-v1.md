@@ -126,7 +126,8 @@ injectable transport interface. It contains no productive HTTP,
 authentication, TLS, credential, or session implementation. Tests use only a
 fake transport and sanitized fake responses.
 
-The collector accepts exactly these requests:
+The collector accepts exactly these requests as its current internal,
+network-free endpoint contract:
 
 * `GET /backups`
 * `GET /backupSessions`
@@ -137,22 +138,52 @@ Every other method, path, or query combination is blocked before the transport
 is called. This includes all restore, start, stop, retry, delete, action, and
 mutation paths. `GET /jobs` is deliberately not allowed.
 
+The internal endpoint contract does not claim that every target is ready for a
+productive Veeam Enterprise Manager transport. Future endpoint changes must be
+based on official Veeam documentation and reviewed separately.
+
 The collector produces only `veeam-evidence-report/v1` with the
 `api_read_only` profile. It does not call the Unified Resilience Report adapter,
 and that adapter continues to reject `api_read_only` reports.
 
-`backup_jobs` and `storage_targets` remain empty in this step. Sessions are not
-emitted as v1 resources. Repository and restore-point entries are emitted only
-when every required identifier and relationship is present in the sanitized
-response. Incomplete entries are omitted rather than completed with invented
-values, and the report remains `INCOMPLETE`. Read-only observations are
-represented as `UNKNOWN`; their presence alone does not prove a resilience
-condition.
+## API-Contract Fixture and Mapping Semantics
+
+The test suite includes minimal sanitized, network-free fixtures shaped after
+documented Veeam Enterprise Manager entity-reference, entity, query-result, and
+resource-link patterns. The fixtures contain only relative links and fake
+identifiers. They contain no real endpoints, customer data, credentials,
+tokens, or raw production responses.
+
+In this context, backup sessions are backup-job execution resources represented
+by `/backupSessions`. They are not authentication sessions, logon sessions, or
+session-manager behavior. Authentication, logon, session-manager, session-ID
+acquisition, TLS, and certificate handling remain future work.
+
+The collector maps fixture evidence conservatively:
+
+* A backup job is emitted only when its job ID, job name, workload type,
+  repository ID, and a successful backup time are explicitly available.
+* A successful backup time requires a directly linked backup-job execution with
+  `Result` set to `Success`, `State` set to `Stopped`, and a valid `EndTime`.
+* Failed, warning, incomplete, ambiguous, or unlinked evidence is not used to
+  create `last_successful_backup`.
+* Missing or ambiguous required relationships cause a resource to be omitted
+  rather than completed with invented values.
+* Repository and restore-point entries are emitted only when every required
+  identifier and relationship is explicit.
+* Read-only observations remain `UNKNOWN`, and the report remains `INCOMPLETE`;
+  observation alone does not prove resilience.
+
+This step adds no productive HTTP client, network access, credentials, secrets,
+authentication, logon, session-manager, TLS, write, or restore behavior. It
+introduces no new endpoints, keeps `GET /jobs` disallowed, and does not call the
+Unified Resilience Report adapter. That adapter continues to reject
+`api_read_only` reports.
 
 ## Future Network Integration Boundary
 
-A future productive client must preserve the strict allowlist, keep TLS
-certificate verification enabled by default, read secrets only from runtime
-secret providers, and never emit secrets, internal endpoints, or raw API
-responses. Authentication and any expansion of the endpoint allowlist require
-a separate explicit design decision and review.
+A future productive client must preserve a separately reviewed strict
+allowlist, keep TLS certificate verification enabled by default, read secrets
+only from runtime secret providers, and never emit secrets, internal endpoints,
+or raw API responses. Authentication and any endpoint-contract change require a
+separate explicit design decision and review.

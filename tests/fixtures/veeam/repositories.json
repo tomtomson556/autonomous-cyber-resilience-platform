@@ -1,0 +1,25 @@
+{
+  "QueryResult": {
+    "Entities": {
+      "Repositories": {
+        "Repository": [
+          {
+            "UID": "urn:veeam:Repository:repository-fixture-001",
+            "Name": "Sanitized Repository",
+            "Type": "Repository",
+            "Href": "/api/repositories/repository-fixture-001",
+            "Links": {
+              "Link": [
+                {
+                  "Rel": "Down",
+                  "Type": "BackupReferenceList",
+                  "Href": "/api/repositories/repository-fixture-001/backups"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

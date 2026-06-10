@@ -1,0 +1,22 @@
+{
+  "EntityReferences": {
+    "Ref": [
+      {
+        "UID": "urn:veeam:RestorePoint:restore-point-fixture-001",
+        "Name": "Sanitized Restore Point",
+        "Type": "RestorePointReference",
+        "Href": "/api/restorePoints/restore-point-fixture-001",
+        "Links": {
+          "Link": [
+            {
+              "Rel": "Up",
+              "Type": "BackupReference",
+              "Href": "/api/backups/backup-fixture-001",
+              "Name": "Sanitized Backup"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
