@@ -128,6 +128,7 @@ def test_non_mock_collector_is_rejected():
         "name": "veeam_enterprise_manager_read_only_collector",
         "mode": "api_read_only",
     }
+    report["completeness_findings"] = []
 
     with pytest.raises(ValueError, match="accepts mock_only evidence only"):
         adapt_veeam_report_to_unified(report)

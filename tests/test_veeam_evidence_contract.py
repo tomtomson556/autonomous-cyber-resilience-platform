@@ -13,6 +13,7 @@ def make_api_read_only_report() -> dict:
         "name": "veeam_enterprise_manager_read_only_collector",
         "mode": "api_read_only",
     }
+    report["completeness_findings"] = []
     return report
 
 
@@ -57,4 +58,49 @@ def test_api_read_only_profile_rejects_unapproved_collector_name():
     report["collector"]["name"] = "custom_collector"
 
     with pytest.raises(ValueError, match="Invalid Veeam api_read_only collector profile"):
+        validate_veeam_collector_profile(report)
+
+
+def test_api_read_only_profile_requires_completeness_findings():
+    report = make_api_read_only_report()
+    del report["completeness_findings"]
+
+    with pytest.raises(ValueError, match="completeness_findings must be a list"):
+        validate_veeam_collector_profile(report)
+
+
+def test_api_read_only_profile_validates_unknown_completeness_evidence():
+    report = make_api_read_only_report()
+    report["completeness_findings"] = [
+        {
+            "resource_type": "repository",
+            "resource_id": "repository-1",
+            "reason": "UnlinkedRepository",
+            "evidence": {
+                "status": "UNKNOWN",
+                "reason": "UnlinkedRepository",
+                "message": "The repository is not linked.",
+            },
+        }
+    ]
+
+    assert validate_veeam_collector_profile(report) == "api_read_only"
+
+
+def test_api_read_only_profile_rejects_non_unknown_completeness_evidence():
+    report = make_api_read_only_report()
+    report["completeness_findings"] = [
+        {
+            "resource_type": "repository",
+            "resource_id": "repository-1",
+            "reason": "UnlinkedRepository",
+            "evidence": {
+                "status": "PASS",
+                "reason": "UnlinkedRepository",
+                "message": "The repository is not linked.",
+            },
+        }
+    ]
+
+    with pytest.raises(ValueError, match="Invalid Veeam api_read_only completeness evidence"):
         validate_veeam_collector_profile(report)

@@ -31,6 +31,13 @@ Every report contains:
 * `restore_points`
 * `storage_targets`
 
+`api_read_only` reports also contain:
+
+* `completeness_findings`
+
+The additional collection is specific to the current `api_read_only` evidence
+path. It is not added to or required from `mock_only` reports.
+
 ## Collector Profiles
 
 The contract recognizes exactly two collector modes:
@@ -82,6 +89,22 @@ Required mock resource fields are:
 
 Required identifiers and resource fields are non-empty strings. Every resource
 identifier must be unique within the report.
+
+## API Read-Only Completeness Findings
+
+The network-free `api_read_only` collector emits a deterministic
+`completeness_findings` list for observed resources that cannot be mapped
+without inventing a relationship or required value. Each finding contains:
+
+* `resource_type`: affected evidence resource type.
+* `resource_id`: safe observed identifier, or `null` when unavailable.
+* `reason`: deterministic reason the resource was not mapped.
+* `evidence`: structured `UNKNOWN` evidence with `status`, `reason`, and
+  `message`.
+
+An affected resource is not also emitted as a normal mapped resource. Findings
+cover missing, unlinked, contradictory, and ambiguous relationships as well as
+required values that the allowed read-only response does not expose.
 
 ## Evidence Status Semantics
 
@@ -168,11 +191,30 @@ The collector maps fixture evidence conservatively:
 * Failed, warning, incomplete, ambiguous, or unlinked evidence is not used to
   create `last_successful_backup`.
 * Missing or ambiguous required relationships cause a resource to be omitted
-  rather than completed with invented values.
+  rather than completed with invented values. The omission is represented by an
+  `UNKNOWN` completeness finding.
 * Repository and restore-point entries are emitted only when every required
-  identifier and relationship is explicit.
+  identifier, required value, and relationship to mapped backup-job evidence is
+  explicit.
 * Read-only observations remain `UNKNOWN`, and the report remains `INCOMPLETE`;
   observation alone does not prove resilience.
+
+The documented `/backups` and `/backupSessions` collection endpoints can return
+entity references rather than the richer entity fields required for
+deterministic backup-job and last-success mapping. The pre-transport fixtures
+exercise sanitized entity-shaped evidence to stabilize mapping semantics, but
+the collector does not claim that a future productive transport can obtain all
+required fields from the currently allowlisted collection requests.
+
+The documented repository response does not expose the storage-target
+relationship required by the current evidence resource contract. The
+documented `/restorePoints` reference response exposes a backup relationship
+but not the required unambiguous UTC creation timestamp. The shipped fixtures
+therefore produce completeness findings for these resources instead of normal
+repository or restore-point evidence.
+
+Fixtures represent exactly one sanitized response page. Pagination is not
+implemented and remains future work.
 
 This step adds no productive HTTP client, network access, credentials, secrets,
 authentication, logon, session-manager, TLS, write, or restore behavior. It
@@ -185,5 +227,8 @@ Unified Resilience Report adapter. That adapter continues to reject
 A future productive client must preserve a separately reviewed strict
 allowlist, keep TLS certificate verification enabled by default, read secrets
 only from runtime secret providers, and never emit secrets, internal endpoints,
-or raw API responses. Authentication and any endpoint-contract change require a
-separate explicit design decision and review.
+or raw API responses. Productive HTTP transport, authentication, session
+management, TLS and certificate handling, secret acquisition, pagination, and
+any endpoint-contract change require a separate explicit design decision and
+review. Write, restore, mutation, and job-control operations remain outside this
+collector boundary.
