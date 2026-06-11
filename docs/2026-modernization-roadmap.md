@@ -65,15 +65,28 @@ malformed evidence is not presented as a confirmed security failure.
   fake-response tests and an enforced method and endpoint allowlist.
 - Add a pre-transport API-contract fixture and conservative mapping step using
   sanitized Veeam Enterprise Manager resource patterns.
+- Add deterministic `api_read_only` completeness findings for observed
+  resources that cannot be mapped because required relationships or values are
+  missing, unlinked, contradictory, or ambiguous.
+- Preserve `UNKNOWN` semantics and omit affected resources from normal mapped
+  collections instead of inventing relationships or identifiers.
+- Keep current sanitized fixtures single-page only; pagination remains future
+  work.
 - Later add a separately reviewed productive read-only transport without
   weakening the reviewed safety boundary. Real authentication, logon,
-  session-manager, TLS, and certificate handling remain future work.
+  session-manager, TLS, certificate handling, secret acquisition, and
+  pagination remain future work.
 - Later decide an explicit Unified Resilience Report adapter policy for
   `api_read_only` evidence.
 - Preserve the no-write, no-restore, and no-direct-API-to-unified-report
   boundary throughout these steps.
 - Map source evidence, collection timestamps, and confidence or completeness
   information into the unified schema.
+
+The current branch still implements no productive HTTP client, authentication,
+TLS or certificate handling, secret acquisition, write, restore, mutation, or
+job-control operation. The Unified Resilience Report adapter continues to reject
+`api_read_only`.
 
 ## Milestone 2: Deterministic resilience evaluation
 

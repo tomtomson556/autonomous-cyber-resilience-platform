@@ -10,6 +10,7 @@
           "JobUid": "urn:veeam:Job:job-fixture-001",
           "JobName": "Sanitized Backup Job",
           "RepositoryUid": "urn:veeam:Repository:repository-fixture-001",
+          "RepositoryName": "Sanitized Repository",
           "Platform": "VMware",
           "Links": {
             "Link": [
