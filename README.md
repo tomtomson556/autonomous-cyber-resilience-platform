@@ -12,8 +12,9 @@ enterprise-ready.
 
 The currently implemented technical core includes a read-only AWS S3 security
 evidence collector and rule-based validator, versioned S3 and mock Veeam
-evidence contracts, and deterministic local adapters into the Unified
-Resilience Report Schema.
+evidence contracts, deterministic local adapters into the Unified Resilience
+Report Schema, and a local deterministic composer for existing Unified
+Resilience Reports.
 
 The project name uses "Autonomous" to describe automated evidence collection,
 validation, and assistance. It does not mean autonomous changes to production
@@ -215,6 +216,9 @@ Key components:
   into the Unified Resilience Report Schema.
 * `src/tools/veeam_unified_report_adapter.py` maps mock Veeam Evidence Report v1
   evidence into the Unified Resilience Report Schema.
+* `src/tools/unified_report_composer.py` validates and deterministically combines
+  existing Unified Resilience Reports without collecting or reinterpreting
+  evidence.
 * `infrastructure/terraform/` defines the S3 lab infrastructure as code.
 * `.github/workflows/ci.yml` runs Python, test, linting, and Terraform validation.
 * `.github/workflows/aws-security-validation.yml` runs the OIDC-based AWS S3 security validation workflow.
@@ -223,6 +227,21 @@ Key components:
   evidence.
 * `reports/` stores local runtime reports and is intentionally excluded from GitHub.
 * `tests/` contains unit tests using mocked boto3 clients.
+
+### Compose Unified Reports
+
+Combine at least two existing Unified Resilience Reports:
+
+```bash
+python -m src.tools.unified_report_composer \
+  first-unified-report.json \
+  second-unified-report.json \
+  --output reports/composed-unified-report.json
+```
+
+The composer rejects duplicate identifiers, incompatible classifications, and
+invalid contracts. It preserves `UNKNOWN` evidence, records input provenance,
+performs no network access, and does not overwrite existing output files.
 
 ---
 
