@@ -1,0 +1,31 @@
+{
+  "schema_version": "restore-test-evidence/v1",
+  "report_type": "restore_test_evidence_report",
+  "generated_at": "2026-06-12T12:30:00+00:00",
+  "source": {
+    "source_id": "fixture-source-invalid-time",
+    "source_type": "sanitized_fixture"
+  },
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "restore_tests": [
+    {
+      "restore_test_id": "restore-test-invalid-time-001",
+      "asset_id": "asset-example-invalid-time",
+      "source_system": "example-backup-system",
+      "source_backup_reference": "backup-example-invalid-time",
+      "restore_scope": "full_asset",
+      "restore_target_type": "isolated_test_environment",
+      "started_at": "2026-06-12T12:00:00+01:00",
+      "completed_at": "2026-06-12T12:10:00+01:00",
+      "duration_seconds": 600,
+      "result": "PASS",
+      "reason": "NonUtcTiming",
+      "message": "This fixture intentionally uses non-UTC timestamps.",
+      "provenance": {
+        "source_record_id": "fixture-record-invalid-time-001",
+        "collected_at": "2026-06-12T12:20:00+00:00",
+        "collection_method": "sanitized_fixture"
+      }
+    }
+  ]
+}

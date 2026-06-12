@@ -1,0 +1,30 @@
+{
+  "schema_version": "restore-test-evidence/v1",
+  "report_type": "restore_test_evidence_report",
+  "generated_at": "2026-06-12T12:30:00+00:00",
+  "source": {
+    "source_id": "fixture-source-invalid",
+    "source_type": "sanitized_fixture"
+  },
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "restore_tests": [
+    {
+      "restore_test_id": "restore-test-invalid-001",
+      "asset_id": "asset-example-invalid",
+      "source_system": "example-backup-system",
+      "source_backup_reference": "backup-example-invalid",
+      "restore_scope": "full_asset",
+      "restore_target_type": "isolated_test_environment",
+      "started_at": null,
+      "completed_at": null,
+      "duration_seconds": null,
+      "result": "UNKNOWN",
+      "reason": "MissingMessage",
+      "provenance": {
+        "source_record_id": "fixture-record-invalid-001",
+        "collected_at": "2026-06-12T12:20:00+00:00",
+        "collection_method": "sanitized_fixture"
+      }
+    }
+  ]
+}

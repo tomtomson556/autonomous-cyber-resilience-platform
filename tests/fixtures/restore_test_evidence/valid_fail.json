@@ -1,0 +1,31 @@
+{
+  "schema_version": "restore-test-evidence/v1",
+  "report_type": "restore_test_evidence_report",
+  "generated_at": "2026-06-12T12:30:00Z",
+  "source": {
+    "source_id": "fixture-source-fail",
+    "source_type": "sanitized_fixture"
+  },
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "restore_tests": [
+    {
+      "restore_test_id": "restore-test-fail-001",
+      "asset_id": "asset-example-002",
+      "source_system": "example-backup-system",
+      "source_backup_reference": "backup-example-002",
+      "restore_scope": "partial_asset",
+      "restore_target_type": "sandbox",
+      "started_at": "2026-06-12T12:00:00Z",
+      "completed_at": "2026-06-12T12:05:00Z",
+      "duration_seconds": 300,
+      "result": "FAIL",
+      "reason": "RestoreValidationFailed",
+      "message": "The sanitized restore test completed but validation failed.",
+      "provenance": {
+        "source_record_id": "fixture-record-fail-001",
+        "collected_at": "2026-06-12T12:20:00Z",
+        "collection_method": "sanitized_fixture"
+      }
+    }
+  ]
+}

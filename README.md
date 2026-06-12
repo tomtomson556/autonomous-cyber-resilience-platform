@@ -15,7 +15,9 @@ evidence collector and rule-based validator, versioned S3 and mock Veeam
 evidence contracts, deterministic local adapters into the Unified Resilience
 Report Schema, and a local deterministic composer for existing Unified
 Resilience Reports. A separate local deterministic RPO/RTO policy evaluator
-produces derived evaluation reports without modifying Unified evidence.
+produces derived evaluation reports without modifying Unified evidence. A
+local `restore-test-evidence/v1` contract validates sanitized restore-test
+records as groundwork for later RTO evaluation.
 
 The project name uses "Autonomous" to describe automated evidence collection,
 validation, and assistance. It does not mean autonomous changes to production
@@ -222,6 +224,8 @@ Key components:
   evidence.
 * `src/tools/rpo_rto_evaluator.py` evaluates explicit local RPO/RTO policy and
   emits a separate `resilience-evaluation-report/v1`.
+* `src/tools/restore_test_evidence.py` validates and deterministically orders
+  local `restore-test-evidence/v1` records without executing restores.
 * `infrastructure/terraform/` defines the S3 lab infrastructure as code.
 * `.github/workflows/ci.yml` runs Python, test, linting, and Terraform validation.
 * `.github/workflows/aws-security-validation.yml` runs the OIDC-based AWS S3 security validation workflow.
@@ -266,6 +270,10 @@ restore-test evidence contract exists because backups and restore points do not
 prove recoverability.
 
 See `docs/rpo-rto-evaluation-v1.md` for the policy and evaluation contracts.
+
+`docs/restore-test-evidence-v1.md` defines the separate local restore-test
+evidence contract. The contract does not perform restores or change current RTO
+results; RTO remains `UNKNOWN` until a later integration step.
 
 ---
 

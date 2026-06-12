@@ -1,0 +1,31 @@
+{
+  "schema_version": "restore-test-evidence/v1",
+  "report_type": "restore_test_evidence_report",
+  "generated_at": "2026-06-12T12:30:00+00:00",
+  "source": {
+    "source_id": "fixture-source-unknown",
+    "source_type": "sanitized_fixture"
+  },
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "restore_tests": [
+    {
+      "restore_test_id": "restore-test-unknown-001",
+      "asset_id": "asset-example-003",
+      "source_system": "example-backup-system",
+      "source_backup_reference": "backup-example-003",
+      "restore_scope": "item_level",
+      "restore_target_type": "alternate_non_production_location",
+      "started_at": null,
+      "completed_at": null,
+      "duration_seconds": null,
+      "result": "UNKNOWN",
+      "reason": "RestoreTestEvidenceIncomplete",
+      "message": "The sanitized record does not contain complete restore-test evidence.",
+      "provenance": {
+        "source_record_id": "fixture-record-unknown-001",
+        "collected_at": "2026-06-12T12:20:00+00:00",
+        "collection_method": "sanitized_fixture"
+      }
+    }
+  ]
+}

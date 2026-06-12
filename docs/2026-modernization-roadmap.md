@@ -37,6 +37,8 @@ and controlled orchestration.
   access.
 - Deterministic local `rpo-rto-policy/v1` evaluation producing separate
   `resilience-evaluation-report/v1` output without modifying Unified evidence.
+- Local versioned `restore-test-evidence/v1` contract and deterministic
+  validator with no restore execution or network access.
 
 ## Foundation Gate: Evidence contract and S3 source stability
 
@@ -98,7 +100,8 @@ Reports and introduces no external API access.
 
 - Implement deterministic RPO evaluation rules and explicit deferred RTO
   `UNKNOWN` results until a restore-test evidence contract exists.
-- Add restore-test evidence.
+- Integrate validated `restore-test-evidence/v1` into a later separately
+  reviewed RTO evaluation pipeline.
 - Add cross-source risk scoring based on explicit, reviewable rules.
 - Keep scores as prioritization aids rather than final authorization decisions.
 
