@@ -20,6 +20,12 @@
       "duration_seconds": null,
       "result": "UNKNOWN",
       "reason": "MissingMessage",
+      "validation": {
+        "method": "sanitized_fixture",
+        "status": "UNKNOWN",
+        "checked_at": null,
+        "evidence_reference": null
+      },
       "provenance": {
         "source_record_id": "fixture-record-invalid-001",
         "collected_at": "2026-06-12T12:20:00+00:00",

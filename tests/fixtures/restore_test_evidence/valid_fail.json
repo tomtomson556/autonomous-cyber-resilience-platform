@@ -21,6 +21,12 @@
       "result": "FAIL",
       "reason": "RestoreValidationFailed",
       "message": "The sanitized restore test completed but validation failed.",
+      "validation": {
+        "method": "sanitized_fixture",
+        "status": "FAILED",
+        "checked_at": "2026-06-12T12:10:00Z",
+        "evidence_reference": "fixture-validation-fail-001"
+      },
       "provenance": {
         "source_record_id": "fixture-record-fail-001",
         "collected_at": "2026-06-12T12:20:00Z",

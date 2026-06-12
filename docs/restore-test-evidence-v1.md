@@ -48,6 +48,12 @@ Each restore-test provenance `collection_method` allows:
 * `manual_import`
 * `external_record_import`
 
+Each restore-test `validation.method` is the report's source type:
+
+* `sanitized_fixture`
+* `manual_attestation`
+* `external_test_record`
+
 Source profiles are fixed:
 
 * `sanitized_fixture` requires `MOCK_EXAMPLE_ONLY` and `sanitized_fixture`.
@@ -80,9 +86,11 @@ Every report contains exactly:
   `SANITIZED_OPERATIONAL_EVIDENCE`.
 * `restore_tests`: Non-empty list of restore-test evidence.
 
-Version 1 defines no optional report, source, restore-test, or provenance
-fields. Timing fields are required keys but may all be `null` only for
-incomplete `UNKNOWN` evidence.
+Version 1 defines no optional report, source, restore-test, validation, or
+provenance fields. Timing fields are required keys but may all be `null` only
+for incomplete `UNKNOWN` evidence. Validation fields are required keys; only
+`UNKNOWN` evidence may use `null` for `validation.checked_at` or
+`validation.evidence_reference`.
 
 The source object contains exactly:
 
@@ -109,7 +117,17 @@ Every restore-test entry contains exactly:
 * `result`: `PASS`, `FAIL`, or `UNKNOWN`.
 * `reason`: Non-empty deterministic reason.
 * `message`: Non-empty human-readable explanation.
+* `validation`: Exact structured validation attestation.
 * `provenance`: Exact source-record provenance.
+
+Validation contains exactly:
+
+* `method`: Must equal the report's `source.source_type`.
+* `status`: `VERIFIED`, `FAILED`, or `UNKNOWN`, with the result mapping defined
+  below.
+* `checked_at`: Strict UTC timestamp, or `null` only for `UNKNOWN`.
+* `evidence_reference`: Sanitized stable local reference to the validation
+  record, or `null` only for `UNKNOWN`.
 
 Provenance contains exactly:
 
@@ -117,20 +135,37 @@ Provenance contains exactly:
 * `collected_at`: Strict UTC timestamp.
 * `collection_method`: One allowed local collection method.
 
-Restore-test entries are returned in deterministic `restore_test_id` order.
-Input objects are not mutated.
+`restore_test_id` values must be unique. The tuple
+`(source.source_id, provenance.source_record_id)` is also unique within a
+report, preventing one source record from being represented as multiple
+restore tests. Restore-test entries are returned in deterministic
+`restore_test_id` order. Input objects are not mutated.
 
 ## Result Semantics
 
-* `PASS`: A complete restore test finished and its defined validation passed.
-* `FAIL`: A complete restore test finished but restore or validation failed.
+* `PASS`: A complete restore test finished and the source attested its
+  structured validation as `VERIFIED`.
+* `FAIL`: A complete restore test finished and the source attested its
+  structured validation as `FAILED`.
 * `UNKNOWN`: Available evidence cannot support a reliable pass or fail
-  conclusion.
+  conclusion, and structured validation is `UNKNOWN`.
 
 `PASS` and `FAIL` require complete, internally consistent timing. `UNKNOWN` may
 contain complete timing when the outcome remains inconclusive, or all timing
 fields may be `null` when timing evidence is unavailable. Partially populated
 timing is rejected.
+
+For every entry, `provenance.collected_at` must not be after `generated_at`.
+When completion and validation timestamps exist, the complete ordering is
+`started_at <= completed_at <= validation.checked_at <=
+provenance.collected_at <= generated_at`.
+
+Free-text `reason` and `message` explain the outcome but are never sufficient
+validation evidence and are never used to derive `result`. All non-empty
+strings reject whitespace-only values. Validation evidence references use the
+same sanitized local-reference restrictions as other references and cannot be
+URLs, paths, hostnames, connection strings, secrets, tokens, credentials, or
+raw API data.
 
 `UNKNOWN` is never treated as a confirmed restore failure. This contract does
 not convert any result into an RTO conclusion.
@@ -161,6 +196,12 @@ Complete sanitized examples are shipped under
   "result": "PASS",
   "reason": "RestoreCompletedAndValidated",
   "message": "The sanitized restore test completed and validation passed.",
+  "validation": {
+    "method": "sanitized_fixture",
+    "status": "VERIFIED",
+    "checked_at": "2026-06-12T12:15:00+00:00",
+    "evidence_reference": "fixture-validation-pass-001"
+  },
   "provenance": {
     "source_record_id": "fixture-record-pass-001",
     "collected_at": "2026-06-12T12:20:00+00:00",
@@ -175,7 +216,13 @@ Complete sanitized examples are shipped under
 {
   "result": "FAIL",
   "reason": "RestoreValidationFailed",
-  "message": "The restore completed but its defined validation failed."
+  "message": "The restore completed but its defined validation failed.",
+  "validation": {
+    "method": "sanitized_fixture",
+    "status": "FAILED",
+    "checked_at": "2026-06-12T12:10:00Z",
+    "evidence_reference": "fixture-validation-fail-001"
+  }
 }
 ```
 
@@ -191,7 +238,13 @@ required.
   "duration_seconds": null,
   "result": "UNKNOWN",
   "reason": "RestoreTestEvidenceIncomplete",
-  "message": "The local record does not contain complete restore-test evidence."
+  "message": "The local record does not contain complete restore-test evidence.",
+  "validation": {
+    "method": "sanitized_fixture",
+    "status": "UNKNOWN",
+    "checked_at": null,
+    "evidence_reference": null
+  }
 }
 ```
 

@@ -21,6 +21,12 @@
       "result": "PASS",
       "reason": "RestoreCompletedAndValidated",
       "message": "The sanitized restore test completed and validation passed.",
+      "validation": {
+        "method": "sanitized_fixture",
+        "status": "VERIFIED",
+        "checked_at": "2026-06-12T12:15:00+00:00",
+        "evidence_reference": "fixture-validation-pass-001"
+      },
       "provenance": {
         "source_record_id": "fixture-record-pass-001",
         "collected_at": "2026-06-12T12:20:00+00:00",

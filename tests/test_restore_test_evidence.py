@@ -96,6 +96,7 @@ def test_unknown_evidence_with_complete_consistent_timing_is_valid():
     report = load_fixture("valid_pass.json")
     report["restore_tests"][0]["result"] = "UNKNOWN"
     report["restore_tests"][0]["reason"] = "ValidationInconclusive"
+    report["restore_tests"][0]["validation"]["status"] = "UNKNOWN"
 
     result = validate_restore_test_evidence(report)
 
@@ -127,6 +128,7 @@ def test_sanitized_operational_source_profiles_are_valid(
     report["source"]["source_type"] = source_type
     report["data_classification"] = classification
     report["restore_tests"][0]["provenance"]["collection_method"] = collection_method
+    report["restore_tests"][0]["validation"]["method"] = source_type
 
     result = validate_restore_test_evidence(report)
 
@@ -192,6 +194,53 @@ def test_fractional_timestamp_duration_mismatch_is_rejected():
         validate_restore_test_evidence(report)
 
 
+def test_provenance_collected_after_report_generation_is_rejected():
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["provenance"]["collected_at"] = (
+        "2026-06-12T12:31:00Z"
+    )
+
+    with pytest.raises(ValueError, match="collected_at.*must not be after generated_at"):
+        validate_restore_test_evidence(report)
+
+
+def test_completion_after_provenance_collection_is_rejected():
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["provenance"]["collected_at"] = (
+        "2026-06-12T12:09:00Z"
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="completed_at.*must not be after.*provenance.collected_at",
+    ):
+        validate_restore_test_evidence(report)
+
+
+def test_valid_complete_timestamp_chain_is_accepted():
+    report = load_fixture("valid_pass.json")
+
+    result = validate_restore_test_evidence(report)
+
+    restore_test = result["restore_tests"][0]
+    assert restore_test["started_at"] <= restore_test["completed_at"]
+    assert (
+        restore_test["completed_at"]
+        <= restore_test["validation"]["checked_at"]
+        <= restore_test["provenance"]["collected_at"]
+        <= result["generated_at"]
+    )
+
+
+def test_unknown_without_completion_remains_valid_when_collection_precedes_generation():
+    report = load_fixture("valid_unknown.json")
+
+    result = validate_restore_test_evidence(report)
+
+    assert result["restore_tests"][0]["completed_at"] is None
+    assert result["restore_tests"][0]["provenance"]["collected_at"] <= result["generated_at"]
+
+
 @pytest.mark.parametrize(
     ("field_name", "value"),
     [
@@ -215,6 +264,7 @@ def test_unapproved_result_scope_or_target_is_rejected(field_name, value):
         ("source", "endpoint", "blocked"),
         ("restore_test", "token", "blocked"),
         ("provenance", "hostname", "blocked"),
+        ("validation", "connection", "blocked"),
     ],
 )
 def test_closed_objects_reject_auth_network_and_secret_fields(
@@ -228,6 +278,7 @@ def test_closed_objects_reject_auth_network_and_secret_fields(
         "source": report["source"],
         "restore_test": report["restore_tests"][0],
         "provenance": report["restore_tests"][0]["provenance"],
+        "validation": report["restore_tests"][0]["validation"],
     }
     targets[location][field_name] = value
 
@@ -248,6 +299,10 @@ def test_closed_objects_reject_auth_network_and_secret_fields(
             "credential-example-001",
         ),
         (("restore_tests", 0, "source_system"), "internal.example.local"),
+        (
+            ("restore_tests", 0, "validation", "evidence_reference"),
+            "secret-validation-record",
+        ),
     ],
 )
 def test_references_must_be_sanitized(path, value):
@@ -267,6 +322,28 @@ def test_duplicate_restore_test_ids_are_rejected():
 
     with pytest.raises(ValueError, match="identifiers must be unique"):
         validate_restore_test_evidence(report)
+
+
+def test_duplicate_source_evidence_is_rejected_for_different_restore_test_ids():
+    report = load_fixture("valid_pass.json")
+    second = deepcopy(report["restore_tests"][0])
+    second["restore_test_id"] = "restore-test-pass-002"
+    report["restore_tests"].append(second)
+
+    with pytest.raises(ValueError, match="source evidence references.*must be unique"):
+        validate_restore_test_evidence(report)
+
+
+def test_different_source_record_ids_are_allowed():
+    report = load_fixture("valid_pass.json")
+    second = deepcopy(report["restore_tests"][0])
+    second["restore_test_id"] = "restore-test-pass-002"
+    second["provenance"]["source_record_id"] = "fixture-record-pass-002"
+    report["restore_tests"].append(second)
+
+    result = validate_restore_test_evidence(report)
+
+    assert len(result["restore_tests"]) == 2
 
 
 def test_restore_tests_are_sorted_deterministically_without_mutating_input():
@@ -312,6 +389,92 @@ def test_provenance_timestamp_must_be_utc():
     )
 
     with pytest.raises(ValueError, match="UTC timestamp"):
+        validate_restore_test_evidence(report)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("restore_tests", 0, "reason"),
+        ("restore_tests", 0, "message"),
+        ("source", "source_id"),
+        ("restore_tests", 0, "restore_test_id"),
+        ("restore_tests", 0, "provenance", "source_record_id"),
+        ("restore_tests", 0, "validation", "evidence_reference"),
+    ],
+)
+def test_whitespace_only_strings_are_rejected(path):
+    report = load_fixture("valid_pass.json")
+    target = report
+    for component in path[:-1]:
+        target = target[component]
+    target[path[-1]] = "   "
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        validate_restore_test_evidence(report)
+
+
+@pytest.mark.parametrize(
+    ("result", "validation_status", "message"),
+    [
+        ("PASS", "FAILED", "must be 'VERIFIED' for result 'PASS'"),
+        ("FAIL", "VERIFIED", "must be 'FAILED' for result 'FAIL'"),
+        ("UNKNOWN", "VERIFIED", "must be 'UNKNOWN' for result 'UNKNOWN'"),
+    ],
+)
+def test_result_requires_matching_structured_validation_status(
+    result,
+    validation_status,
+    message,
+):
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["result"] = result
+    report["restore_tests"][0]["validation"]["status"] = validation_status
+
+    with pytest.raises(ValueError, match=message):
+        validate_restore_test_evidence(report)
+
+
+def test_validation_method_must_match_source_profile():
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["validation"]["method"] = "manual_attestation"
+
+    with pytest.raises(ValueError, match="validation.method.*source profile"):
+        validate_restore_test_evidence(report)
+
+
+@pytest.mark.parametrize("field_name", ["checked_at", "evidence_reference"])
+def test_pass_requires_complete_structured_validation_evidence(field_name):
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["validation"][field_name] = None
+
+    with pytest.raises(ValueError, match=f"validation.{field_name}"):
+        validate_restore_test_evidence(report)
+
+
+def test_validation_checked_at_must_be_utc():
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["validation"]["checked_at"] = (
+        "2026-06-12T13:15:00+01:00"
+    )
+
+    with pytest.raises(ValueError, match="validation.checked_at.*UTC timestamp"):
+        validate_restore_test_evidence(report)
+
+
+def test_validation_checked_at_before_completion_is_rejected():
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["validation"]["checked_at"] = "2026-06-12T12:09:00Z"
+
+    with pytest.raises(ValueError, match="validation.checked_at.*must not precede"):
+        validate_restore_test_evidence(report)
+
+
+def test_validation_checked_at_after_collection_is_rejected():
+    report = load_fixture("valid_pass.json")
+    report["restore_tests"][0]["validation"]["checked_at"] = "2026-06-12T12:21:00Z"
+
+    with pytest.raises(ValueError, match="validation.checked_at.*must not be after"):
         validate_restore_test_evidence(report)
 
 

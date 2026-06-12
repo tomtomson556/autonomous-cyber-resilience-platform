@@ -18,6 +18,7 @@ VALID_SOURCE_TYPES = frozenset(
 VALID_COLLECTION_METHODS = frozenset(
     {"sanitized_fixture", "manual_import", "external_record_import"}
 )
+VALID_VALIDATION_STATUSES = frozenset({"VERIFIED", "FAILED", "UNKNOWN"})
 SOURCE_PROFILE = {
     "sanitized_fixture": {
         "data_classification": "MOCK_EXAMPLE_ONLY",
@@ -65,10 +66,14 @@ RESTORE_TEST_FIELDS = frozenset(
         "reason",
         "message",
         "provenance",
+        "validation",
     }
 )
 PROVENANCE_FIELDS = frozenset(
     {"source_record_id", "collected_at", "collection_method"}
+)
+VALIDATION_FIELDS = frozenset(
+    {"method", "status", "checked_at", "evidence_reference"}
 )
 
 
@@ -82,7 +87,7 @@ def _require_exact_fields(value: object, expected: frozenset[str], field_name: s
 
 
 def _require_non_empty_string(value: object, field_name: str) -> str:
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Field '{field_name}' must be a non-empty string.")
     return value
 
@@ -124,22 +129,26 @@ def _validate_provenance(
     provenance: object,
     field_name: str,
     expected_collection_method: str,
-) -> None:
+) -> tuple[str, datetime]:
     provenance = _require_exact_fields(provenance, PROVENANCE_FIELDS, field_name)
-    _require_safe_reference(
+    source_record_id = _require_safe_reference(
         provenance["source_record_id"],
         f"{field_name}.source_record_id",
     )
-    _parse_utc_timestamp(provenance["collected_at"], f"{field_name}.collected_at")
+    collected_at = _parse_utc_timestamp(
+        provenance["collected_at"],
+        f"{field_name}.collected_at",
+    )
     if provenance["collection_method"] not in VALID_COLLECTION_METHODS:
         raise ValueError(f"Field '{field_name}.collection_method' is invalid.")
     if provenance["collection_method"] != expected_collection_method:
         raise ValueError(
             f"Field '{field_name}.collection_method' does not match source profile."
         )
+    return source_record_id, collected_at
 
 
-def _validate_timing(restore_test: dict, field_name: str) -> None:
+def _validate_timing(restore_test: dict, field_name: str) -> datetime | None:
     started_at = restore_test["started_at"]
     completed_at = restore_test["completed_at"]
     duration_seconds = restore_test["duration_seconds"]
@@ -148,7 +157,7 @@ def _validate_timing(restore_test: dict, field_name: str) -> None:
     if all(value is None for value in timing_values):
         if restore_test["result"] != "UNKNOWN":
             raise ValueError(f"Field '{field_name}' PASS/FAIL timing is required.")
-        return
+        return None
 
     if any(value is None for value in timing_values):
         raise ValueError(f"Field '{field_name}' timing must be complete or entirely null.")
@@ -166,13 +175,65 @@ def _validate_timing(restore_test: dict, field_name: str) -> None:
     observed_duration = (completed - started).total_seconds()
     if observed_duration != duration_seconds:
         raise ValueError(f"Field '{field_name}.duration_seconds' does not match timestamps.")
+    return completed
+
+
+def _validate_validation(
+    validation: object,
+    field_name: str,
+    result: str,
+    expected_method: str,
+) -> datetime | None:
+    validation = _require_exact_fields(validation, VALIDATION_FIELDS, field_name)
+    if validation["method"] != expected_method:
+        raise ValueError(f"Field '{field_name}.method' does not match source profile.")
+    if validation["status"] not in VALID_VALIDATION_STATUSES:
+        raise ValueError(f"Field '{field_name}.status' is invalid.")
+
+    expected_status = {
+        "PASS": "VERIFIED",
+        "FAIL": "FAILED",
+        "UNKNOWN": "UNKNOWN",
+    }[result]
+    if validation["status"] != expected_status:
+        raise ValueError(
+            f"Field '{field_name}.status' must be '{expected_status}' for result "
+            f"'{result}'."
+        )
+
+    checked_at = validation["checked_at"]
+    evidence_reference = validation["evidence_reference"]
+    if result == "UNKNOWN":
+        parsed_checked_at = (
+            None
+            if checked_at is None
+            else _parse_utc_timestamp(checked_at, f"{field_name}.checked_at")
+        )
+        if evidence_reference is not None:
+            _require_safe_reference(
+                evidence_reference,
+                f"{field_name}.evidence_reference",
+            )
+        return parsed_checked_at
+
+    parsed_checked_at = _parse_utc_timestamp(
+        checked_at,
+        f"{field_name}.checked_at",
+    )
+    _require_safe_reference(
+        evidence_reference,
+        f"{field_name}.evidence_reference",
+    )
+    return parsed_checked_at
 
 
 def _validate_restore_test(
     restore_test: object,
     index: int,
+    source_id: str,
+    expected_validation_method: str,
     expected_collection_method: str,
-) -> str:
+) -> tuple[str, tuple[str, str], datetime]:
     field_name = f"restore_tests[{index}]"
     restore_test = _require_exact_fields(
         restore_test,
@@ -203,13 +264,35 @@ def _validate_restore_test(
 
     _require_non_empty_string(restore_test["reason"], f"{field_name}.reason")
     _require_non_empty_string(restore_test["message"], f"{field_name}.message")
-    _validate_provenance(
+    source_record_id, collected_at = _validate_provenance(
         restore_test["provenance"],
         f"{field_name}.provenance",
         expected_collection_method,
     )
-    _validate_timing(restore_test, field_name)
-    return restore_test_id
+    completed_at = _validate_timing(restore_test, field_name)
+    checked_at = _validate_validation(
+        restore_test["validation"],
+        f"{field_name}.validation",
+        restore_test["result"],
+        expected_validation_method,
+    )
+    if completed_at is not None and completed_at > collected_at:
+        raise ValueError(
+            f"Field '{field_name}.completed_at' must not be after "
+            f"{field_name}.provenance.collected_at."
+        )
+    if checked_at is not None:
+        if completed_at is not None and checked_at < completed_at:
+            raise ValueError(
+                f"Field '{field_name}.validation.checked_at' must not precede "
+                f"{field_name}.completed_at."
+            )
+        if checked_at > collected_at:
+            raise ValueError(
+                f"Field '{field_name}.validation.checked_at' must not be after "
+                f"{field_name}.provenance.collected_at."
+            )
+    return restore_test_id, (source_id, source_record_id), collected_at
 
 
 def validate_restore_test_evidence(report: object) -> dict:
@@ -221,7 +304,7 @@ def validate_restore_test_evidence(report: object) -> dict:
         )
     if report["report_type"] != REPORT_TYPE:
         raise ValueError(f"Restore-test report_type must be '{REPORT_TYPE}'.")
-    _parse_utc_timestamp(report["generated_at"], "generated_at")
+    generated_at = _parse_utc_timestamp(report["generated_at"], "generated_at")
     _validate_source(report["source"])
     if report["data_classification"] not in VALID_DATA_CLASSIFICATIONS:
         raise ValueError("Field 'data_classification' is invalid.")
@@ -233,16 +316,29 @@ def validate_restore_test_evidence(report: object) -> dict:
     if not isinstance(restore_tests, list) or not restore_tests:
         raise ValueError("Field 'restore_tests' must be a non-empty list.")
 
-    restore_test_ids = [
+    validated_restore_tests = [
         _validate_restore_test(
             restore_test,
             index,
+            report["source"]["source_id"],
+            report["source"]["source_type"],
             source_profile["collection_method"],
         )
         for index, restore_test in enumerate(restore_tests)
     ]
+    restore_test_ids = [item[0] for item in validated_restore_tests]
     if len(set(restore_test_ids)) != len(restore_test_ids):
         raise ValueError("Restore-test identifiers must be unique.")
+    source_evidence_ids = [item[1] for item in validated_restore_tests]
+    if len(set(source_evidence_ids)) != len(source_evidence_ids):
+        raise ValueError(
+            "Restore-test source evidence references "
+            "(source.source_id, provenance.source_record_id) must be unique."
+        )
+    if any(item[2] > generated_at for item in validated_restore_tests):
+        raise ValueError(
+            "Field 'provenance.collected_at' must not be after generated_at."
+        )
 
     normalized = deepcopy(report)
     normalized["restore_tests"].sort(key=lambda item: item["restore_test_id"])

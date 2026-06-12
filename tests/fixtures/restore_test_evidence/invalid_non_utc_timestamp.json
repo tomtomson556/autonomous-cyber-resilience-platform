@@ -21,6 +21,12 @@
       "result": "PASS",
       "reason": "NonUtcTiming",
       "message": "This fixture intentionally uses non-UTC timestamps.",
+      "validation": {
+        "method": "sanitized_fixture",
+        "status": "VERIFIED",
+        "checked_at": "2026-06-12T12:15:00+00:00",
+        "evidence_reference": "fixture-validation-invalid-time-001"
+      },
       "provenance": {
         "source_record_id": "fixture-record-invalid-time-001",
         "collected_at": "2026-06-12T12:20:00+00:00",

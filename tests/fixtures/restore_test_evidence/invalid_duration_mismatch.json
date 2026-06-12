@@ -21,6 +21,12 @@
       "result": "PASS",
       "reason": "DurationMismatch",
       "message": "This fixture intentionally contains a duration mismatch.",
+      "validation": {
+        "method": "sanitized_fixture",
+        "status": "VERIFIED",
+        "checked_at": "2026-06-12T12:15:00+00:00",
+        "evidence_reference": "fixture-validation-invalid-duration-001"
+      },
       "provenance": {
         "source_record_id": "fixture-record-invalid-duration-001",
         "collected_at": "2026-06-12T12:20:00+00:00",
