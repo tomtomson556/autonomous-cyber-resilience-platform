@@ -146,9 +146,10 @@ Report or change its overall status.
 RPO evaluation uses only explicit, directly linked, successful backup evidence.
 Missing, malformed, ambiguous, unlinked, incomplete, or future-dated evidence
 produces `UNKNOWN`, not a confirmed failure. Version 1 keeps every configured
-RTO result `UNKNOWN` until a separate versioned restore-test evidence contract
-exists. Backup existence, successful backup sessions, restore points, and RPO
-success do not prove recoverability or RTO compliance.
+RTO result `UNKNOWN`. The separate `restore-test-evidence/v1` contract is not
+yet integrated into the evaluator; that integration requires a later,
+separately reviewed pipeline. Backup existence, successful backup sessions,
+restore points, and RPO success do not prove recoverability or RTO compliance.
 
 See `rpo-rto-evaluation-v1.md` for the versioned policy and evaluation report
 contracts.

@@ -71,8 +71,11 @@ objective, the result is always `UNKNOWN` with reason
 
 Backup existence, successful backup sessions, restore-point existence, and RPO
 success do not prove recoverability or RTO compliance. Arbitrary
-restore-test-looking fields are deliberately ignored until a separate
-versioned restore-test evidence contract exists.
+restore-test-looking fields are deliberately ignored. The separate
+`restore-test-evidence/v1` contract now defines validated local evidence, but it
+is intentionally not integrated into this evaluator version. A later,
+separately reviewed pipeline must define that integration before RTO may become
+`PASS` or `FAIL`.
 
 ## Evaluation Report Contract
 

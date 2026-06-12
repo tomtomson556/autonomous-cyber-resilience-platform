@@ -1,0 +1,37 @@
+{
+  "schema_version": "restore-test-evidence/v1",
+  "report_type": "restore_test_evidence_report",
+  "generated_at": "2026-06-12T12:30:00+00:00",
+  "source": {
+    "source_id": "fixture-source-invalid-duration",
+    "source_type": "sanitized_fixture"
+  },
+  "data_classification": "MOCK_EXAMPLE_ONLY",
+  "restore_tests": [
+    {
+      "restore_test_id": "restore-test-invalid-duration-001",
+      "asset_id": "asset-example-invalid-duration",
+      "source_system": "example-backup-system",
+      "source_backup_reference": "backup-example-invalid-duration",
+      "restore_scope": "full_asset",
+      "restore_target_type": "isolated_test_environment",
+      "started_at": "2026-06-12T12:00:00+00:00",
+      "completed_at": "2026-06-12T12:10:00+00:00",
+      "duration_seconds": 601,
+      "result": "PASS",
+      "reason": "DurationMismatch",
+      "message": "This fixture intentionally contains a duration mismatch.",
+      "validation": {
+        "method": "sanitized_fixture",
+        "status": "VERIFIED",
+        "checked_at": "2026-06-12T12:15:00+00:00",
+        "evidence_reference": "fixture-validation-invalid-duration-001"
+      },
+      "provenance": {
+        "source_record_id": "fixture-record-invalid-duration-001",
+        "collected_at": "2026-06-12T12:20:00+00:00",
+        "collection_method": "sanitized_fixture"
+      }
+    }
+  ]
+}
