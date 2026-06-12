@@ -59,6 +59,9 @@ malformed evidence is not presented as a confirmed security failure.
   deterministic local adapter.
 - Stabilize the mock-based Veeam Evidence Report v1 contract and deterministic
   unified adapter.
+- Add a deterministic local Unified Resilience Report composer that preserves
+  source evidence and provenance while rejecting duplicate identifiers and
+  incompatible classifications.
 - Define the `api_read_only` collector profile and safety boundary in
   `veeam-evidence-report/v1`.
 - Implement network-free Veeam Enterprise Manager collector groundwork with
@@ -86,7 +89,8 @@ malformed evidence is not presented as a confirmed security failure.
 The current branch still implements no productive HTTP client, authentication,
 TLS or certificate handling, secret acquisition, write, restore, mutation, or
 job-control operation. The Unified Resilience Report adapter continues to reject
-`api_read_only`.
+`api_read_only`. The local composer only combines existing Unified Resilience
+Reports and introduces no external API access.
 
 ## Milestone 2: Deterministic resilience evaluation
 

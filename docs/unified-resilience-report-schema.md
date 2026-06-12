@@ -38,6 +38,33 @@ also preserves the original S3 overall status and every check-level `PASS`,
 actions; those asset fields remain `null` and `recommended_actions` remains
 empty.
 
+## Composing Existing Unified Reports
+
+The local `unified_report_composer` combines two or more existing Unified
+Resilience Reports without collecting new evidence. It validates the input
+contract, rejects duplicate source, asset, finding, and action identifiers, and
+sorts merged collections deterministically.
+
+The composer preserves input assets, evidence sources, findings, actions, and
+`UNKNOWN` semantics without reinterpretation. Its overall status is calculated
+conservatively from input overall statuses and findings. `CRITICAL` has
+precedence over `AT_RISK`, followed by `INCOMPLETE` and `HEALTHY`.
+
+All inputs must use the same `data_classification`; the project defines no
+implicit classification downgrade or escalation rule. Composer provenance
+records stable input identifiers, timestamps, schema versions, report types,
+evidence-source identifiers, and input overall statuses.
+
+The CLI accepts existing local JSON reports:
+
+```bash
+python -m src.tools.unified_report_composer INPUT... --output OUTPUT
+```
+
+It does not overwrite inputs or an existing output file. The composer performs
+no network requests and introduces no Veeam transport, authentication, TLS,
+secret handling, restore, mutation, or job-control behavior.
+
 ## Evidence Sources
 
 `evidence_sources` records the systems and reports used to build the unified
