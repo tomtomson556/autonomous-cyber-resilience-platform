@@ -138,6 +138,21 @@ reference. If no recent test evidence is available, its status is `UNKNOWN`
 with a reason such as `NoRecentRestoreTestEvidence`; it is not automatically a
 confirmed restore failure.
 
+The local deterministic evaluator is intentionally a separate policy layer. It
+consumes a Unified Resilience Report and `rpo-rto-policy/v1`, then emits
+`resilience-evaluation-report/v1`. It does not add results back into the Unified
+Report or change its overall status.
+
+RPO evaluation uses only explicit, directly linked, successful backup evidence.
+Missing, malformed, ambiguous, unlinked, incomplete, or future-dated evidence
+produces `UNKNOWN`, not a confirmed failure. Version 1 keeps every configured
+RTO result `UNKNOWN` until a separate versioned restore-test evidence contract
+exists. Backup existence, successful backup sessions, restore points, and RPO
+success do not prove recoverability or RTO compliance.
+
+See `rpo-rto-evaluation-v1.md` for the versioned policy and evaluation report
+contracts.
+
 ## Risk Scoring
 
 `risk_score` contains a numeric score, a level, and human-readable rationale.

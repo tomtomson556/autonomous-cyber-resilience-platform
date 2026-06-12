@@ -14,7 +14,8 @@ The currently implemented technical core includes a read-only AWS S3 security
 evidence collector and rule-based validator, versioned S3 and mock Veeam
 evidence contracts, deterministic local adapters into the Unified Resilience
 Report Schema, and a local deterministic composer for existing Unified
-Resilience Reports.
+Resilience Reports. A separate local deterministic RPO/RTO policy evaluator
+produces derived evaluation reports without modifying Unified evidence.
 
 The project name uses "Autonomous" to describe automated evidence collection,
 validation, and assistance. It does not mean autonomous changes to production
@@ -219,6 +220,8 @@ Key components:
 * `src/tools/unified_report_composer.py` validates and deterministically combines
   existing Unified Resilience Reports without collecting or reinterpreting
   evidence.
+* `src/tools/rpo_rto_evaluator.py` evaluates explicit local RPO/RTO policy and
+  emits a separate `resilience-evaluation-report/v1`.
 * `infrastructure/terraform/` defines the S3 lab infrastructure as code.
 * `.github/workflows/ci.yml` runs Python, test, linting, and Terraform validation.
 * `.github/workflows/aws-security-validation.yml` runs the OIDC-based AWS S3 security validation workflow.
@@ -242,6 +245,27 @@ python -m src.tools.unified_report_composer \
 The composer rejects duplicate identifiers, incompatible classifications, and
 invalid contracts. It preserves `UNKNOWN` evidence, records input provenance,
 performs no network access, and does not overwrite existing output files.
+
+### Evaluate RPO/RTO Policy
+
+Evaluate one existing Unified Resilience Report against a local
+`rpo-rto-policy/v1` policy:
+
+```bash
+python -m src.tools.rpo_rto_evaluator \
+  unified-report.json \
+  --policy rpo-rto-policy.json \
+  --output reports/resilience-evaluation-report.json \
+  --evaluation-timestamp 2026-06-12T12:00:00+00:00
+```
+
+The evaluator creates a separate `resilience-evaluation-report/v1`; it does not
+modify the Unified input or its global status. RPO uses only explicit,
+directly linked `PASS` backup evidence. RTO remains `UNKNOWN` until a separate
+restore-test evidence contract exists because backups and restore points do not
+prove recoverability.
+
+See `docs/rpo-rto-evaluation-v1.md` for the policy and evaluation contracts.
 
 ---
 
