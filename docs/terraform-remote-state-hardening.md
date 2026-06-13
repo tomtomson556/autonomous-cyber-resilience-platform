@@ -128,10 +128,12 @@ state. It is therefore not a substitute for Terraform state locking.
 Do not configure default Object Lock retention as the baseline for a Terraform
 state bucket containing `.tflock` objects. AWS applies bucket default retention
 to every new object version placed in the bucket. That includes lock-file
-versions. A simple delete can still create a delete marker, but permanently
-deleting a retained lock-file version can fail or require governance-bypass
-permissions. Default retention therefore complicates stale-lock cleanup and
-recovery without replacing Terraform's locking protocol. Terraform requires
+versions. In a versioned bucket, a normal `DeleteObject` request can create a
+delete marker without permanently deleting protected lock-file versions, so
+default retention does not always prevent a normal Terraform unlock. The
+stronger operational risk is the accumulation of protected `.tflock` versions,
+permanent cleanup complexity, recovery complexity, and the governance or
+compliance overhead required to manage them. Terraform requires
 `s3:DeleteObject` on the `.tflock` object for normal lock cleanup.
 
 Versioning plus restrictive IAM delete permissions is the safer baseline for
@@ -270,3 +272,4 @@ state or permissions.
   and [S3 CloudTrail events](https://docs.aws.amazon.com/AmazonS3/latest/userguide/cloudtrail-logging-s3-info.html)
 - AWS:
   [S3 Bucket Keys](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-key.html)
+  and [AWS KMS key rotation](https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html)
