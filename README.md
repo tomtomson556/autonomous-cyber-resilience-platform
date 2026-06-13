@@ -578,6 +578,11 @@ State files and local variable files are intentionally excluded from GitHub via 
 
 The Terraform-managed lab bucket is created with Object Lock enabled at bucket creation time. The default retention configuration uses Governance mode with a 1-day retention period for safe lab testing.
 
+For the reviewed target architecture, safety boundaries, least-privilege access,
+and manual migration checklist for a dedicated S3 remote backend, see
+[`docs/terraform-remote-state-hardening.md`](docs/terraform-remote-state-hardening.md).
+The runbook is guidance only and does not perform a backend migration.
+
 ---
 
 ## GitHub Actions OIDC Validation

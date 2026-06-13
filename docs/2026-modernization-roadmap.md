@@ -152,6 +152,11 @@ select, authorize, or execute critical runbooks independently.
 - Add SBOM and supply-chain evidence.
 - Continue S3 evidence source hardening.
 - Evaluate temporary credentials and separately approved deployment workflows.
+- Move local Terraform state toward a dedicated, separately bootstrapped S3
+  backend with versioning, least-privilege access, and native S3 lockfile
+  locking. Follow the documentation-only
+  [Terraform remote state hardening runbook](terraform-remote-state-hardening.md);
+  productive migration remains a separately approved operations-hardening step.
 
 ## Apply notes
 
