@@ -375,16 +375,18 @@ def _rto_unknown(
     restore_test_id: str | None = None,
     source_ids: list[str] | None = None,
 ) -> dict:
-    return {
+    result = {
         "objective_type": "RTO",
         "objective_minutes": rule["rto_objective_minutes"],
         "observed_recovery_minutes": None,
         "status": "UNKNOWN",
         "reason": reason,
         "message": message,
-        "restore_test_id": restore_test_id,
         "source_evidence_ids": source_ids or [],
     }
+    if restore_test_id is not None:
+        result["restore_test_id"] = restore_test_id
+    return result
 
 
 def _has_future_restore_timestamp(
@@ -416,7 +418,10 @@ def _evaluate_rto(
         return _rto_unknown(
             rule,
             "RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE",
-            "RTO cannot be evaluated without validated restore-test evidence.",
+            (
+                "RTO cannot be evaluated until a separate versioned restore-test "
+                "evidence contract exists."
+            ),
         )
 
     matching = [
@@ -521,6 +526,7 @@ def _evaluation_id(
     asset_id: str,
     evaluation_timestamp: str,
     result: dict,
+    restore_test_evidence_reference: str | None = None,
 ) -> str:
     stable_inputs = {
         "schema_version": EVALUATION_SCHEMA_VERSION,
@@ -533,8 +539,17 @@ def _evaluation_id(
         "status": result["status"],
         "reason": result["reason"],
     }
-    if result.get("restore_test_id") is not None or result["source_evidence_ids"]:
+    if (
+        result["objective_type"] == "RTO"
+        and restore_test_evidence_reference is not None
+    ):
+        stable_inputs["restore_test_evidence_reference"] = (
+            restore_test_evidence_reference
+        )
         stable_inputs["restore_test_id"] = result.get("restore_test_id")
+        stable_inputs["observed_recovery_minutes"] = result[
+            "observed_recovery_minutes"
+        ]
         stable_inputs["source_evidence_ids"] = result["source_evidence_ids"]
     digest = hashlib.sha256(_canonical_json(stable_inputs).encode("utf-8")).hexdigest()
     return f"evaluation-{digest[:20]}"
@@ -568,6 +583,14 @@ def evaluate_report(
 
     input_reference = _stable_reference("unified-report", report)
     policy_reference = _stable_policy_reference(policy)
+    restore_test_evidence_reference = (
+        None
+        if validated_restore_test_evidence is None
+        else _stable_reference(
+            "restore-test-evidence",
+            validated_restore_test_evidence,
+        )
+    )
     asset_results = []
     for rule in sorted(policy["rules"], key=lambda item: item["asset_id"]):
         evaluations = [
@@ -594,6 +617,7 @@ def evaluate_report(
                 rule["asset_id"],
                 effective_timestamp,
                 result,
+                restore_test_evidence_reference,
             )
         evaluations.sort(key=lambda item: item["objective_type"])
         asset_results.append(
@@ -627,10 +651,7 @@ def evaluate_report(
     }
     if validated_restore_test_evidence is not None:
         evaluation_report["restore_test_evidence"] = {
-            "reference": _stable_reference(
-                "restore-test-evidence",
-                validated_restore_test_evidence,
-            ),
+            "reference": restore_test_evidence_reference,
             "schema_version": validated_restore_test_evidence["schema_version"],
             "report_type": validated_restore_test_evidence["report_type"],
         }
