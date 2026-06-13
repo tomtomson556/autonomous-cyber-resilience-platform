@@ -40,6 +40,8 @@ and controlled orchestration.
 - Local versioned `restore-test-evidence/v1` contract and deterministic
   validator with structured restore-validation attestations and no restore
   execution or network access.
+- Optional deterministic RTO evaluation from exactly matched, validated
+  `restore-test-evidence/v1`, without modifying Unified evidence.
 
 ## Foundation Gate: Evidence contract and S3 source stability
 
@@ -99,17 +101,17 @@ Reports and introduces no external API access.
 
 ## Milestone 2: Deterministic resilience evaluation
 
-- Implement deterministic RPO evaluation rules and explicit deferred RTO
-  `UNKNOWN` results.
-- Integrate validated `restore-test-evidence/v1` into a later separately
-  reviewed RTO evaluation pipeline.
+- Implement deterministic RPO evaluation rules and a compatible RTO `UNKNOWN`
+  fallback when restore-test evidence is not supplied.
+- Integrate validated `restore-test-evidence/v1` into a separately reviewed
+  deterministic RTO evaluation pipeline.
 - Add cross-source risk scoring based on explicit, reviewable rules.
 - Keep scores as prioritization aids rather than final authorization decisions.
 
-The `restore-test-evidence/v1` contract and validator now exist, but this branch
-does not integrate them into the evaluator or calculate RTO outcomes. RTO
-therefore remains `UNKNOWN` until a later, separately reviewed evaluator or
-pipeline stage performs that integration.
+The evaluator now optionally accepts one validated local restore-test evidence
+report. It calculates RTO only from one exact, unambiguous asset match and
+preserves `UNKNOWN` for missing, ambiguous, inconclusive, or future-dated
+evidence. Risk scoring remains a later, separate step.
 
 ## Milestone 3: Workload context and historical evidence
 

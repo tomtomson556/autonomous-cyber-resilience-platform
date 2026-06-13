@@ -63,19 +63,35 @@ The exact boundary is:
 `UNKNOWN` is never converted into `FAIL`. Evidence on another asset is not
 implicitly correlated with the policy asset.
 
-## Deferred RTO Semantics
+## RTO Semantics
 
-Version 1 performs no real RTO evaluation. If a policy contains an RTO
-objective, the result is always `UNKNOWN` with reason
-`RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE`.
+Version 1 optionally accepts one validated local `restore-test-evidence/v1`
+report. Evidence is matched only by exact `asset_id`. Arbitrary
+restore-test-looking Unified fields and free-text evidence fields are ignored.
+
+Without a restore-test evidence input, configured RTO results preserve the
+compatible `UNKNOWN` result and `RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE` reason.
+With validated evidence:
+
+* No exact asset match produces `RTO_RESTORE_TEST_ASSET_NOT_FOUND`.
+* Multiple reliable exact matches produce `RTO_RESTORE_TEST_AMBIGUOUS`.
+* Structured `UNKNOWN` produces `RTO_RESTORE_TEST_UNKNOWN`.
+* Any relevant timestamp after the evaluation timestamp produces
+  `RTO_RESTORE_TEST_FUTURE_TIMESTAMP`.
+* Structured `FAIL` produces `RTO_RESTORE_TEST_FAILED`, independently of its
+  duration.
+* Structured `PASS` produces `RTO_WITHIN_OBJECTIVE` when
+  `duration_seconds <= rto_objective_minutes * 60`; otherwise it produces
+  `RTO_EXCEEDED_OBJECTIVE`.
+
+`observed_recovery_minutes` is derived from `duration_seconds / 60` for
+structured `PASS` and `FAIL` evidence. No evidence-age rule is applied because
+`rpo-rto-policy/v1` defines no maximum acceptable restore-test age.
 
 Backup existence, successful backup sessions, restore-point existence, and RPO
-success do not prove recoverability or RTO compliance. Arbitrary
-restore-test-looking fields are deliberately ignored. The separate
-`restore-test-evidence/v1` contract now defines validated local evidence, but it
-is intentionally not integrated into this evaluator version. A later,
-separately reviewed pipeline must define that integration before RTO may become
-`PASS` or `FAIL`.
+success do not prove recoverability or RTO compliance. A documented restore
+test supports evaluation of that test record, but it is not a guarantee of
+current live-restore capability.
 
 ## Evaluation Report Contract
 
@@ -87,13 +103,18 @@ type is `resilience_evaluation_report`. It contains:
 * Stable references to the input Unified Report and policy.
 * Stable, asset-sorted policy results.
 * Deterministic evaluation IDs.
-* RPO and optional deferred RTO results with status, reason, message, objective,
+* RPO and optional RTO results with status, reason, message, objective,
   observed value where available, and source evidence identifiers where
   applicable.
+* An optional stable restore-test input reference when that input is supplied.
+* A stable `restore_test_id` on RTO results when one exact evidence entry is
+  evaluated.
 
 The output contains only derived evaluation results. It does not copy the
 Unified Report, create collector evidence, change Unified findings, or alter
-the Unified overall status.
+the Unified overall status. The optional restore-test input reference and
+`restore_test_id` are additive fields in `resilience-evaluation-report/v1`;
+existing RPO result fields and behavior remain unchanged.
 
 ## CLI
 
@@ -101,13 +122,18 @@ the Unified overall status.
 python -m src.tools.rpo_rto_evaluator \
   INPUT \
   --policy POLICY \
+  --restore-test-evidence RESTORE_TEST_EVIDENCE \
   --output OUTPUT \
   --evaluation-timestamp 2026-06-12T12:00:00+00:00
 ```
 
+`--restore-test-evidence` is optional and accepts exactly one local
+`restore-test-evidence/v1` JSON file. Invalid restore-test evidence fails closed
+and produces no evaluation report.
+
 The CLI reads and writes local JSON only, fails closed on invalid contracts,
 does not overwrite an existing output, and refuses to use the input or policy
-path as output.
+path, or restore-test evidence path, as output.
 
 The evaluator adds no external API access, productive transport,
 authentication, TLS or certificate handling, credentials, secrets, restore,

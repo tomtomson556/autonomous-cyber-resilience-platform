@@ -14,9 +14,9 @@ Restore-test evidence is distinct from:
 * RPO evaluation, which measures the age of trustworthy backup evidence.
 
 A successful backup or an existing restore point does not prove that data can
-be restored, validated, or recovered within an objective. RTO therefore remains
-`UNKNOWN` in the current `rpo_rto_evaluator` until a later, separately reviewed
-pipeline explicitly integrates this contract.
+be restored, validated, or recovered within an objective. The local
+`rpo_rto_evaluator` may optionally use this validated contract for deterministic
+RTO evaluation; without a unique, trustworthy match, RTO remains `UNKNOWN`.
 
 ## Contract Identity
 
@@ -170,10 +170,10 @@ raw API data.
 `UNKNOWN` is never treated as a confirmed restore failure. This contract does
 not convert any result into an RTO conclusion.
 
-The existing evaluator retains its v1
-`RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE` reason until a later branch defines and
-reviews the integration pipeline. In that evaluator context, the reason means
-that validated restore-test evidence is not yet available to the evaluator.
+The evaluator retains `RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE` when no
+restore-test evidence input is supplied. When supplied, only structured fields
+from a fully validated report are used. A documented restore test is evidence
+of that test record, not a guarantee of current live-restore capability.
 
 ## Examples
 
