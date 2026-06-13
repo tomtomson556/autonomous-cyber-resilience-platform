@@ -17,7 +17,9 @@ from src.tools.rpo_rto_evaluator import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EVALUATOR_PATH = PROJECT_ROOT / "src" / "tools" / "rpo_rto_evaluator.py"
+RESTORE_FIXTURE_DIRECTORY = PROJECT_ROOT / "tests" / "fixtures" / "restore_test_evidence"
 EVALUATION_TIMESTAMP = "2026-06-12T12:00:00+00:00"
+RTO_EVALUATION_TIMESTAMP = "2026-06-12T13:00:00+00:00"
 
 
 def policy(
@@ -103,6 +105,36 @@ def result_for(report: dict, input_policy: dict | None = None) -> dict:
 
 def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value), encoding="utf-8")
+
+
+def restore_test_evidence(fixture_name: str, asset_id: str = "asset-a") -> dict:
+    with (RESTORE_FIXTURE_DIRECTORY / fixture_name).open(encoding="utf-8") as fixture:
+        evidence = json.load(fixture)
+    evidence["restore_tests"][0]["asset_id"] = asset_id
+    return evidence
+
+
+def rto_result(
+    evidence: dict | None,
+    *,
+    asset_id: str = "asset-a",
+    evaluation_timestamp: str = RTO_EVALUATION_TIMESTAMP,
+) -> tuple[dict, dict]:
+    input_policy = policy(
+        asset_id,
+        evaluation_timestamp=evaluation_timestamp,
+        include_rto=True,
+    )
+    evaluation = evaluate_report(
+        unified_report(backup_asset(asset_id)),
+        input_policy,
+        restore_test_evidence=evidence,
+    )
+    results = {
+        result["objective_type"]: result
+        for result in evaluation["asset_results"][0]["evaluations"]
+    }
+    return results["RTO"], results["RPO"]
 
 
 def test_valid_policy_is_accepted_and_loadable(tmp_path):
@@ -367,7 +399,7 @@ def test_embedded_backup_job_with_unlinked_source_produces_unknown():
     assert result["reason"] == "UNLINKED_BACKUP_EVIDENCE"
 
 
-def test_rto_always_remains_unknown_and_does_not_interpret_restore_fields():
+def test_rto_without_explicit_evidence_does_not_interpret_unified_restore_fields():
     asset = backup_asset("asset-a")
     asset["restore_point"] = {"status": "PASS"}
     asset["restore_test_evidence"] = {
@@ -389,6 +421,257 @@ def test_rto_always_remains_unknown_and_does_not_interpret_restore_fields():
     assert results["RTO"]["status"] == "UNKNOWN"
     assert results["RTO"]["reason"] == "RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE"
     assert results["RTO"]["source_evidence_ids"] == []
+
+
+def test_rto_passes_from_validated_restore_test_within_objective():
+    result, rpo_result_value = rto_result(
+        restore_test_evidence("valid_pass.json"),
+    )
+
+    assert result == {
+        "evaluation_id": result["evaluation_id"],
+        "objective_type": "RTO",
+        "objective_minutes": 60,
+        "observed_recovery_minutes": 10,
+        "status": "PASS",
+        "reason": "RTO_WITHIN_OBJECTIVE",
+        "message": "The validated restore test completed within the RTO objective.",
+        "restore_test_id": "restore-test-pass-001",
+        "source_evidence_ids": [
+            "backup-example-001",
+            "fixture-record-pass-001",
+            "fixture-source-pass",
+            "fixture-validation-pass-001",
+        ],
+    }
+    assert rpo_result_value["status"] == "PASS"
+
+
+def test_rto_fails_when_validated_pass_restore_test_exceeds_objective():
+    evidence = restore_test_evidence("valid_pass.json")
+    restore_test = evidence["restore_tests"][0]
+    restore_test["started_at"] = "2026-06-12T11:00:00+00:00"
+    restore_test["completed_at"] = "2026-06-12T12:10:00+00:00"
+    restore_test["duration_seconds"] = 4200
+
+    result, _ = rto_result(evidence)
+
+    assert result["status"] == "FAIL"
+    assert result["reason"] == "RTO_EXCEEDED_OBJECTIVE"
+    assert result["observed_recovery_minutes"] == 70
+
+
+def test_rto_passes_at_exact_seconds_to_minutes_objective_boundary():
+    evidence = restore_test_evidence("valid_pass.json")
+    restore_test = evidence["restore_tests"][0]
+    restore_test["started_at"] = "2026-06-12T11:10:00+00:00"
+    restore_test["completed_at"] = "2026-06-12T12:10:00+00:00"
+    restore_test["duration_seconds"] = 3600
+
+    result, _ = rto_result(evidence)
+
+    assert result["status"] == "PASS"
+    assert result["reason"] == "RTO_WITHIN_OBJECTIVE"
+    assert result["observed_recovery_minutes"] == 60
+
+
+def test_rto_fails_when_structured_restore_test_result_is_fail():
+    result, _ = rto_result(restore_test_evidence("valid_fail.json"))
+
+    assert result["status"] == "FAIL"
+    assert result["reason"] == "RTO_RESTORE_TEST_FAILED"
+    assert result["observed_recovery_minutes"] == 5
+
+
+def test_rto_unknown_without_restore_test_evidence_preserves_compatible_output():
+    result, _ = rto_result(None)
+
+    assert result == {
+        "objective_type": "RTO",
+        "objective_minutes": 60,
+        "observed_recovery_minutes": None,
+        "status": "UNKNOWN",
+        "reason": "RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE",
+        "message": (
+            "RTO cannot be evaluated until a separate versioned restore-test "
+            "evidence contract exists."
+        ),
+        "source_evidence_ids": [],
+        "evaluation_id": "evaluation-7cc7e7aca58cf7f6cf04",
+    }
+
+
+def test_rto_unknown_for_structured_unknown_restore_test():
+    result, _ = rto_result(restore_test_evidence("valid_unknown.json"))
+
+    assert result["status"] == "UNKNOWN"
+    assert result["reason"] == "RTO_RESTORE_TEST_UNKNOWN"
+    assert result["restore_test_id"] == "restore-test-unknown-001"
+    assert result["observed_recovery_minutes"] is None
+
+
+def test_rto_unknown_for_multiple_reliable_restore_tests():
+    evidence = restore_test_evidence("valid_pass.json")
+    second = deepcopy(evidence["restore_tests"][0])
+    second["restore_test_id"] = "restore-test-pass-002"
+    second["source_backup_reference"] = "backup-example-002"
+    second["provenance"]["source_record_id"] = "fixture-record-pass-002"
+    second["validation"]["evidence_reference"] = "fixture-validation-pass-002"
+    evidence["restore_tests"].append(second)
+
+    result, _ = rto_result(evidence)
+
+    assert result["status"] == "UNKNOWN"
+    assert result["reason"] == "RTO_RESTORE_TEST_AMBIGUOUS"
+    assert "restore_test_id" not in result
+    assert "fixture-record-pass-002" in result["source_evidence_ids"]
+
+
+def test_restore_test_for_another_asset_is_not_used():
+    result, _ = rto_result(
+        restore_test_evidence("valid_pass.json", asset_id="asset-other"),
+    )
+
+    assert result["status"] == "UNKNOWN"
+    assert result["reason"] == "RTO_RESTORE_TEST_ASSET_NOT_FOUND"
+    assert result["source_evidence_ids"] == []
+
+
+def test_rto_unknown_when_restore_test_report_has_future_timestamp():
+    result, _ = rto_result(
+        restore_test_evidence("valid_pass.json"),
+        evaluation_timestamp="2026-06-12T12:25:00+00:00",
+    )
+
+    assert result["status"] == "UNKNOWN"
+    assert result["reason"] == "RTO_RESTORE_TEST_FUTURE_TIMESTAMP"
+    assert result["restore_test_id"] == "restore-test-pass-001"
+
+
+def test_invalid_restore_test_evidence_fails_closed():
+    evidence = restore_test_evidence("valid_pass.json")
+    evidence["restore_tests"][0]["duration_seconds"] = 1
+
+    with pytest.raises(ValueError, match="duration_seconds.*does not match"):
+        rto_result(evidence)
+
+
+def test_rto_ignores_restore_test_free_text_for_decision():
+    evidence = restore_test_evidence("valid_pass.json")
+    evidence["restore_tests"][0]["reason"] = "ClaimsFailure"
+    evidence["restore_tests"][0]["message"] = "Claims that the objective was exceeded."
+
+    result, _ = rto_result(evidence)
+
+    assert result["status"] == "PASS"
+    assert result["reason"] == "RTO_WITHIN_OBJECTIVE"
+
+
+def test_restore_test_evidence_produces_stable_output_ids_and_input_reference():
+    evidence = restore_test_evidence("valid_pass.json")
+    report = unified_report(backup_asset("asset-a"))
+    input_policy = policy(
+        "asset-a",
+        evaluation_timestamp=RTO_EVALUATION_TIMESTAMP,
+        include_rto=True,
+    )
+
+    first = evaluate_report(report, input_policy, restore_test_evidence=evidence)
+    second = evaluate_report(report, input_policy, restore_test_evidence=evidence)
+
+    assert first == second
+    assert first["restore_test_evidence"]["reference"].startswith(
+        "restore-test-evidence:sha256:"
+    )
+
+
+def test_rto_evaluation_id_changes_with_restore_evidence_and_observed_duration():
+    first_evidence = restore_test_evidence("valid_pass.json")
+    second_evidence = deepcopy(first_evidence)
+    second_restore_test = second_evidence["restore_tests"][0]
+    second_restore_test["started_at"] = "2026-06-12T11:50:00+00:00"
+    second_restore_test["duration_seconds"] = 1200
+    report = unified_report(backup_asset("asset-a"))
+    input_policy = policy(
+        "asset-a",
+        evaluation_timestamp=RTO_EVALUATION_TIMESTAMP,
+        include_rto=True,
+    )
+
+    first = evaluate_report(
+        report,
+        input_policy,
+        restore_test_evidence=first_evidence,
+    )
+    second = evaluate_report(
+        report,
+        input_policy,
+        restore_test_evidence=second_evidence,
+    )
+    first_rto = first["asset_results"][0]["evaluations"][1]
+    second_rto = second["asset_results"][0]["evaluations"][1]
+
+    assert first_rto["restore_test_id"] == second_rto["restore_test_id"]
+    assert first_rto["source_evidence_ids"] == second_rto["source_evidence_ids"]
+    assert first_rto["observed_recovery_minutes"] == 10
+    assert second_rto["observed_recovery_minutes"] == 20
+    assert first["restore_test_evidence"]["reference"] != (
+        second["restore_test_evidence"]["reference"]
+    )
+    assert first_rto["evaluation_id"] != second_rto["evaluation_id"]
+
+
+def test_restore_test_order_does_not_change_output_or_evaluation_ids():
+    evidence = restore_test_evidence("valid_pass.json", asset_id="asset-a")
+    second = deepcopy(evidence["restore_tests"][0])
+    second["restore_test_id"] = "restore-test-pass-002"
+    second["asset_id"] = "asset-b"
+    second["source_backup_reference"] = "backup-example-002"
+    second["provenance"]["source_record_id"] = "fixture-record-pass-002"
+    second["validation"]["evidence_reference"] = "fixture-validation-pass-002"
+    evidence["restore_tests"].append(second)
+    reversed_evidence = deepcopy(evidence)
+    reversed_evidence["restore_tests"].reverse()
+    report = unified_report(backup_asset("asset-b"), backup_asset("asset-a"))
+    input_policy = policy(
+        "asset-b",
+        "asset-a",
+        evaluation_timestamp=RTO_EVALUATION_TIMESTAMP,
+        include_rto=True,
+    )
+
+    first = evaluate_report(report, input_policy, restore_test_evidence=evidence)
+    reordered = evaluate_report(
+        report,
+        input_policy,
+        restore_test_evidence=reversed_evidence,
+    )
+
+    assert first == reordered
+    assert [result["asset_id"] for result in first["asset_results"]] == [
+        "asset-a",
+        "asset-b",
+    ]
+
+
+def test_restore_test_evidence_does_not_change_rpo_result():
+    report = unified_report(backup_asset("asset-a"))
+    input_policy = policy(
+        "asset-a",
+        evaluation_timestamp=RTO_EVALUATION_TIMESTAMP,
+        include_rto=True,
+    )
+
+    without_evidence = evaluate_report(report, input_policy)
+    with_evidence = evaluate_report(
+        report,
+        input_policy,
+        restore_test_evidence=restore_test_evidence("valid_pass.json"),
+    )
+
+    assert without_evidence["asset_results"][0]["evaluations"][0] == (
+        with_evidence["asset_results"][0]["evaluations"][0]
+    )
 
 
 def test_output_is_separate_and_input_objects_are_not_mutated():
@@ -484,6 +767,94 @@ def test_cli_writes_valid_separate_output(tmp_path):
     assert exit_code == 0
     assert json.loads(output_path.read_text(encoding="utf-8"))["schema_version"] == (
         EVALUATION_SCHEMA_VERSION
+    )
+
+
+def test_cli_evaluates_valid_restore_test_evidence(tmp_path):
+    input_path = tmp_path / "input.json"
+    policy_path = tmp_path / "policy.json"
+    restore_path = tmp_path / "restore.json"
+    output_path = tmp_path / "output.json"
+    write_json(input_path, unified_report(backup_asset("asset-a")))
+    write_json(
+        policy_path,
+        policy(
+            "asset-a",
+            evaluation_timestamp=RTO_EVALUATION_TIMESTAMP,
+            include_rto=True,
+        ),
+    )
+    write_json(restore_path, restore_test_evidence("valid_pass.json"))
+
+    exit_code = main(
+        [
+            str(input_path),
+            "--policy",
+            str(policy_path),
+            "--restore-test-evidence",
+            str(restore_path),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    output = json.loads(output_path.read_text(encoding="utf-8"))
+    rto = output["asset_results"][0]["evaluations"][1]
+    assert exit_code == 0
+    assert rto["status"] == "PASS"
+
+
+def test_cli_fails_closed_for_invalid_restore_test_evidence(tmp_path):
+    input_path = tmp_path / "input.json"
+    policy_path = tmp_path / "policy.json"
+    restore_path = tmp_path / "restore.json"
+    output_path = tmp_path / "output.json"
+    invalid_evidence = restore_test_evidence("valid_pass.json")
+    invalid_evidence["restore_tests"][0]["duration_seconds"] = 1
+    write_json(input_path, unified_report(backup_asset("asset-a")))
+    write_json(policy_path, policy("asset-a", include_rto=True))
+    write_json(restore_path, invalid_evidence)
+
+    exit_code = main(
+        [
+            str(input_path),
+            "--policy",
+            str(policy_path),
+            "--restore-test-evidence",
+            str(restore_path),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code != 0
+    assert not output_path.exists()
+
+
+def test_cli_refuses_restore_test_evidence_path_as_output(tmp_path, capsys):
+    input_path = tmp_path / "input.json"
+    policy_path = tmp_path / "policy.json"
+    restore_path = tmp_path / "restore.json"
+    write_json(input_path, unified_report(backup_asset("asset-a")))
+    write_json(policy_path, policy("asset-a", include_rto=True))
+    write_json(restore_path, restore_test_evidence("valid_pass.json"))
+
+    exit_code = main(
+        [
+            str(input_path),
+            "--policy",
+            str(policy_path),
+            "--restore-test-evidence",
+            str(restore_path),
+            "--output",
+            str(restore_path),
+        ]
+    )
+
+    assert exit_code != 0
+    assert "Output path must differ" in capsys.readouterr().err
+    assert json.loads(restore_path.read_text(encoding="utf-8"))["schema_version"] == (
+        "restore-test-evidence/v1"
     )
 
 

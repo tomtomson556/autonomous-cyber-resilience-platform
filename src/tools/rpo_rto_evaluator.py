@@ -5,6 +5,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from src.tools.restore_test_evidence import (
+    load_restore_test_evidence,
+    validate_restore_test_evidence,
+)
+
 
 POLICY_SCHEMA_VERSION = "rpo-rto-policy/v1"
 POLICY_REPORT_TYPE = "rpo_rto_policy"
@@ -353,18 +358,164 @@ def _evaluate_rpo(
     }
 
 
-def _evaluate_rto(rule: dict) -> dict:
-    return {
+def _restore_test_source_ids(restore_test_report: dict, restore_test: dict) -> list[str]:
+    references = [
+        restore_test_report["source"]["source_id"],
+        restore_test["source_backup_reference"],
+        restore_test["provenance"]["source_record_id"],
+        restore_test["validation"]["evidence_reference"],
+    ]
+    return sorted({reference for reference in references if reference is not None})
+
+
+def _rto_unknown(
+    rule: dict,
+    reason: str,
+    message: str,
+    restore_test_id: str | None = None,
+    source_ids: list[str] | None = None,
+) -> dict:
+    result = {
         "objective_type": "RTO",
         "objective_minutes": rule["rto_objective_minutes"],
         "observed_recovery_minutes": None,
         "status": "UNKNOWN",
-        "reason": "RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE",
-        "message": (
-            "RTO cannot be evaluated until a separate versioned restore-test "
-            "evidence contract exists."
-        ),
-        "source_evidence_ids": [],
+        "reason": reason,
+        "message": message,
+        "source_evidence_ids": source_ids or [],
+    }
+    if restore_test_id is not None:
+        result["restore_test_id"] = restore_test_id
+    return result
+
+
+def _has_future_restore_timestamp(
+    restore_test_report: dict,
+    restore_test: dict,
+    evaluation_time: datetime,
+) -> bool:
+    timestamps = [
+        restore_test_report["generated_at"],
+        restore_test["started_at"],
+        restore_test["completed_at"],
+        restore_test["validation"]["checked_at"],
+        restore_test["provenance"]["collected_at"],
+    ]
+    return any(
+        _parse_utc_timestamp(timestamp, "restore_test_evidence.timestamp")
+        > evaluation_time
+        for timestamp in timestamps
+        if timestamp is not None
+    )
+
+
+def _evaluate_rto(
+    rule: dict,
+    restore_test_report: dict | None,
+    evaluation_time: datetime,
+) -> dict:
+    if restore_test_report is None:
+        return _rto_unknown(
+            rule,
+            "RTO_EVIDENCE_CONTRACT_NOT_AVAILABLE",
+            (
+                "RTO cannot be evaluated until a separate versioned restore-test "
+                "evidence contract exists."
+            ),
+        )
+
+    matching = [
+        restore_test
+        for restore_test in restore_test_report["restore_tests"]
+        if restore_test["asset_id"] == rule["asset_id"]
+    ]
+    if not matching:
+        return _rto_unknown(
+            rule,
+            "RTO_RESTORE_TEST_ASSET_NOT_FOUND",
+            "No restore-test evidence exactly matches the policy asset.",
+        )
+
+    reliable = [
+        restore_test for restore_test in matching if restore_test["result"] != "UNKNOWN"
+    ]
+    if len(reliable) > 1 or (not reliable and len(matching) > 1):
+        source_ids = sorted(
+            {
+                source_id
+                for restore_test in matching
+                for source_id in _restore_test_source_ids(
+                    restore_test_report,
+                    restore_test,
+                )
+            }
+        )
+        return _rto_unknown(
+            rule,
+            "RTO_RESTORE_TEST_AMBIGUOUS",
+            "Multiple restore-test evidence entries prevent deterministic evaluation.",
+            source_ids=source_ids,
+        )
+
+    restore_test = reliable[0] if reliable else matching[0]
+    restore_test_id = restore_test["restore_test_id"]
+    source_ids = _restore_test_source_ids(restore_test_report, restore_test)
+    if _has_future_restore_timestamp(
+        restore_test_report,
+        restore_test,
+        evaluation_time,
+    ):
+        return _rto_unknown(
+            rule,
+            "RTO_RESTORE_TEST_FUTURE_TIMESTAMP",
+            "The restore-test evidence contains a timestamp after evaluation time.",
+            restore_test_id,
+            source_ids,
+        )
+
+    if restore_test["result"] == "UNKNOWN":
+        return _rto_unknown(
+            rule,
+            "RTO_RESTORE_TEST_UNKNOWN",
+            "The structured restore-test result is UNKNOWN.",
+            restore_test_id,
+            source_ids,
+        )
+
+    observed_recovery_minutes = restore_test["duration_seconds"] / 60
+    if restore_test["result"] == "FAIL":
+        return {
+            "objective_type": "RTO",
+            "objective_minutes": rule["rto_objective_minutes"],
+            "observed_recovery_minutes": observed_recovery_minutes,
+            "status": "FAIL",
+            "reason": "RTO_RESTORE_TEST_FAILED",
+            "message": "The structured restore-test result is FAIL.",
+            "restore_test_id": restore_test_id,
+            "source_evidence_ids": source_ids,
+        }
+
+    objective = rule["rto_objective_minutes"]
+    if restore_test["duration_seconds"] <= objective * 60:
+        return {
+            "objective_type": "RTO",
+            "objective_minutes": objective,
+            "observed_recovery_minutes": observed_recovery_minutes,
+            "status": "PASS",
+            "reason": "RTO_WITHIN_OBJECTIVE",
+            "message": "The validated restore test completed within the RTO objective.",
+            "restore_test_id": restore_test_id,
+            "source_evidence_ids": source_ids,
+        }
+    return {
+        "objective_type": "RTO",
+        "objective_minutes": objective,
+        "observed_recovery_minutes": observed_recovery_minutes,
+        "status": "FAIL",
+        "reason": "RTO_EXCEEDED_OBJECTIVE",
+        "message": "The validated restore test exceeded the RTO objective.",
+        "restore_test_id": restore_test_id,
+        "source_evidence_ids": source_ids,
     }
 
 
@@ -375,6 +526,7 @@ def _evaluation_id(
     asset_id: str,
     evaluation_timestamp: str,
     result: dict,
+    restore_test_evidence_reference: str | None = None,
 ) -> str:
     stable_inputs = {
         "schema_version": EVALUATION_SCHEMA_VERSION,
@@ -387,6 +539,18 @@ def _evaluation_id(
         "status": result["status"],
         "reason": result["reason"],
     }
+    if (
+        result["objective_type"] == "RTO"
+        and restore_test_evidence_reference is not None
+    ):
+        stable_inputs["restore_test_evidence_reference"] = (
+            restore_test_evidence_reference
+        )
+        stable_inputs["restore_test_id"] = result.get("restore_test_id")
+        stable_inputs["observed_recovery_minutes"] = result[
+            "observed_recovery_minutes"
+        ]
+        stable_inputs["source_evidence_ids"] = result["source_evidence_ids"]
     digest = hashlib.sha256(_canonical_json(stable_inputs).encode("utf-8")).hexdigest()
     return f"evaluation-{digest[:20]}"
 
@@ -395,9 +559,15 @@ def evaluate_report(
     report: dict,
     policy: dict,
     evaluation_timestamp: str | None = None,
+    restore_test_evidence: dict | None = None,
 ) -> dict:
     validate_policy(policy)
     assets_by_id, evidence_source_ids = _validate_unified_report(report)
+    validated_restore_test_evidence = (
+        None
+        if restore_test_evidence is None
+        else validate_restore_test_evidence(restore_test_evidence)
+    )
 
     effective_timestamp = (
         evaluation_timestamp
@@ -413,6 +583,14 @@ def evaluate_report(
 
     input_reference = _stable_reference("unified-report", report)
     policy_reference = _stable_policy_reference(policy)
+    restore_test_evidence_reference = (
+        None
+        if validated_restore_test_evidence is None
+        else _stable_reference(
+            "restore-test-evidence",
+            validated_restore_test_evidence,
+        )
+    )
     asset_results = []
     for rule in sorted(policy["rules"], key=lambda item: item["asset_id"]):
         evaluations = [
@@ -424,7 +602,13 @@ def evaluate_report(
             )
         ]
         if "rto_objective_minutes" in rule:
-            evaluations.append(_evaluate_rto(rule))
+            evaluations.append(
+                _evaluate_rto(
+                    rule,
+                    validated_restore_test_evidence,
+                    evaluation_time,
+                )
+            )
         for result in evaluations:
             result["evaluation_id"] = _evaluation_id(
                 input_reference,
@@ -433,6 +617,7 @@ def evaluate_report(
                 rule["asset_id"],
                 effective_timestamp,
                 result,
+                restore_test_evidence_reference,
             )
         evaluations.sort(key=lambda item: item["objective_type"])
         asset_results.append(
@@ -443,7 +628,7 @@ def evaluate_report(
             }
         )
 
-    return {
+    evaluation_report = {
         "schema_version": EVALUATION_SCHEMA_VERSION,
         "report_type": EVALUATION_REPORT_TYPE,
         "evaluation_timestamp": effective_timestamp,
@@ -464,6 +649,13 @@ def evaluate_report(
         },
         "asset_results": asset_results,
     }
+    if validated_restore_test_evidence is not None:
+        evaluation_report["restore_test_evidence"] = {
+            "reference": restore_test_evidence_reference,
+            "schema_version": validated_restore_test_evidence["schema_version"],
+            "report_type": validated_restore_test_evidence["report_type"],
+        }
+    return evaluation_report
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -477,6 +669,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--evaluation-timestamp",
         help="Explicit UTC evaluation timestamp overriding the policy timestamp.",
     )
+    parser.add_argument(
+        "--restore-test-evidence",
+        type=Path,
+        help="Optional validated restore-test-evidence/v1 JSON path.",
+    )
     return parser.parse_args(argv)
 
 
@@ -489,17 +686,26 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     try:
         resolved_output = args.output.resolve()
-        if resolved_output in {args.input.resolve(), args.policy.resolve()}:
-            raise ValueError("Output path must differ from input and policy paths.")
+        protected_inputs = {args.input.resolve(), args.policy.resolve()}
+        if args.restore_test_evidence is not None:
+            protected_inputs.add(args.restore_test_evidence.resolve())
+        if resolved_output in protected_inputs:
+            raise ValueError("Output path must differ from all input paths.")
         if args.output.exists():
             raise ValueError(f"Output path already exists: {args.output}")
 
         report = _load_json(args.input)
         policy = load_policy(args.policy)
+        restore_test_evidence = (
+            None
+            if args.restore_test_evidence is None
+            else load_restore_test_evidence(args.restore_test_evidence)
+        )
         evaluation = evaluate_report(
             report,
             policy,
             args.evaluation_timestamp,
+            restore_test_evidence,
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("x", encoding="utf-8") as output_file:

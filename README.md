@@ -17,7 +17,8 @@ Report Schema, and a local deterministic composer for existing Unified
 Resilience Reports. A separate local deterministic RPO/RTO policy evaluator
 produces derived evaluation reports without modifying Unified evidence. A
 local `restore-test-evidence/v1` contract validates sanitized restore-test
-records as groundwork for later RTO evaluation.
+records, and the evaluator can optionally use one validated report for
+deterministic RTO evaluation.
 
 The project name uses "Autonomous" to describe automated evidence collection,
 validation, and assistance. It does not mean autonomous changes to production
@@ -259,21 +260,25 @@ Evaluate one existing Unified Resilience Report against a local
 python -m src.tools.rpo_rto_evaluator \
   unified-report.json \
   --policy rpo-rto-policy.json \
+  --restore-test-evidence restore-test-evidence.json \
   --output reports/resilience-evaluation-report.json \
   --evaluation-timestamp 2026-06-12T12:00:00+00:00
 ```
 
 The evaluator creates a separate `resilience-evaluation-report/v1`; it does not
 modify the Unified input or its global status. RPO uses only explicit,
-directly linked `PASS` backup evidence. RTO remains `UNKNOWN` until a separate
-restore-test evidence contract exists because backups and restore points do not
-prove recoverability.
+directly linked `PASS` backup evidence. When the optional restore-test evidence
+input is supplied, RTO uses only validated structured `restore-test-evidence/v1`
+that exactly matches the policy asset. Missing, ambiguous, `UNKNOWN`, or
+future-dated restore-test evidence produces RTO `UNKNOWN`.
 
 See `docs/rpo-rto-evaluation-v1.md` for the policy and evaluation contracts.
 
 `docs/restore-test-evidence-v1.md` defines the separate local restore-test
-evidence contract. The contract does not perform restores or change current RTO
-results; RTO remains `UNKNOWN` until a later integration step.
+evidence contract. A documented restore test supports deterministic evaluation
+of that test record; it is not a guarantee of current live-restore capability.
+The integration performs no restore, network access, or productive Veeam
+operation.
 
 ---
 
