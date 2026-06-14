@@ -13,6 +13,11 @@ must be run only after explicit approval, with an identified authoritative
 state source, an independently verified backup, and exclusive control of
 Terraform activity.
 
+Use the
+[Terraform S3 remote state migration specification](terraform-s3-remote-state-migration-spec.md)
+to record unresolved decisions, approvals, responsibilities, and future
+Go/No-Go gates before any migration is authorized.
+
 Do not print, parse, commit, or expose Terraform state while following this
 runbook. State can contain sensitive values even when the corresponding
 Terraform outputs are marked sensitive.
@@ -61,9 +66,10 @@ Use a dedicated S3 bucket only for Terraform state:
 - Enable native Terraform S3 lockfile locking with `use_lockfile = true`.
 - Do not introduce new DynamoDB locking. Current HashiCorp documentation marks
   DynamoDB-based S3 backend locking as deprecated.
-- Audit backend access. Consider CloudTrail S3 data events for the narrowly
-  scoped state prefix because normal CloudTrail event history does not include
-  S3 object-level data events by default.
+- Audit backend access through CloudTrail S3 data events for the narrowly
+  scoped state prefix or an explicitly approved equivalent audit solution.
+  Normal CloudTrail event history does not include S3 object-level data events
+  by default.
 
 The backend resources and their administrative recovery role should have a
 different lifecycle and permission boundary from the infrastructure managed by
@@ -161,7 +167,9 @@ Grant only the backend permissions required for normal operation:
 
 Do not grant the normal deployer role `s3:DeleteObject` or
 `s3:DeleteObjectVersion` for the real state object. Terraform's S3 backend does
-not require `s3:DeleteObject` on the state object for normal operation.
+not require `s3:DeleteObject` on the state object for normal operation. Whether
+to enforce this through omission-only least privilege, explicit deny, or both
+is a future implementation decision that must be reviewed.
 
 The bucket policy should also deny non-TLS requests and prevent access outside
 the reviewed identities and administrative recovery path. Avoid broad wildcard

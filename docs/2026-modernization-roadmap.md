@@ -156,6 +156,8 @@ select, authorize, or execute critical runbooks independently.
   backend with versioning, least-privilege access, and native S3 lockfile
   locking. Follow the documentation-only
   [Terraform remote state hardening runbook](terraform-remote-state-hardening.md);
+  record future migration decisions in the
+  [Terraform S3 remote state migration specification](terraform-s3-remote-state-migration-spec.md);
   productive migration remains a separately approved operations-hardening step.
 
 ## Apply notes
