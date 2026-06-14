@@ -275,8 +275,6 @@ def test_rpo_boundary_behavior(
     ("timestamp", "expected_reason"),
     [
         (None, "MISSING_BACKUP_EVIDENCE"),
-        ("not-a-timestamp", "INVALID_BACKUP_TIMESTAMP"),
-        ("2026-06-12T11:00:00", "NON_UTC_BACKUP_TIMESTAMP"),
         ("2026-06-12T13:00:00+00:00", "FUTURE_BACKUP_TIMESTAMP"),
     ],
 )
@@ -288,7 +286,7 @@ def test_unusable_backup_timestamps_produce_unknown(timestamp, expected_reason):
     assert result["observed_age_minutes"] is None
 
 
-@pytest.mark.parametrize("status", ["UNKNOWN", "FAIL", None])
+@pytest.mark.parametrize("status", ["UNKNOWN", "FAIL"])
 def test_non_pass_backup_evidence_is_not_used(status):
     result = result_for(unified_report(backup_asset("asset-a", status=status)))
 
@@ -322,16 +320,14 @@ def test_backup_evidence_on_another_asset_is_not_correlated():
     assert result["reason"] == "MISSING_BACKUP_EVIDENCE"
 
 
-def test_missing_source_relationship_produces_unknown():
+def test_missing_source_relationship_is_rejected():
     asset = backup_asset("asset-a")
     asset["evidence_source_id"] = "source-not-in-report"
     report = unified_report(asset)
     report["evidence_sources"][0]["source_id"] = "different-source"
 
-    result = result_for(report)
-
-    assert result["status"] == "UNKNOWN"
-    assert result["reason"] == "UNLINKED_BACKUP_EVIDENCE"
+    with pytest.raises(ValueError, match="references unknown identifier"):
+        result_for(report)
 
 
 def test_ambiguous_direct_backup_evidence_produces_unknown():
@@ -379,7 +375,7 @@ def test_embedded_direct_backup_job_can_be_evaluated():
     assert result["source_evidence_ids"] == ["source-backup-a"]
 
 
-def test_embedded_backup_job_with_unlinked_source_produces_unknown():
+def test_embedded_backup_job_with_unlinked_source_is_rejected():
     asset = {
         "asset_id": "workload-a",
         "source_type": "m365",
@@ -393,10 +389,8 @@ def test_embedded_backup_job_with_unlinked_source_produces_unknown():
         "recommended_action": None,
     }
 
-    result = result_for(unified_report(asset))
-
-    assert result["status"] == "UNKNOWN"
-    assert result["reason"] == "UNLINKED_BACKUP_EVIDENCE"
+    with pytest.raises(ValueError, match="references unknown identifier"):
+        result_for(unified_report(asset))
 
 
 def test_rto_without_explicit_evidence_does_not_interpret_unified_restore_fields():
@@ -717,6 +711,13 @@ def test_invalid_unified_report_is_rejected():
     report["schema_version"] = "2.0.0"
 
     with pytest.raises(ValueError, match="Unsupported Unified"):
+        evaluate_report(report, policy("asset-a"))
+
+
+def test_unified_report_with_invalid_embedded_timestamp_is_rejected():
+    report = unified_report(backup_asset("asset-a", timestamp="not-a-timestamp"))
+
+    with pytest.raises(ValueError, match="UTC timestamp"):
         evaluate_report(report, policy("asset-a"))
 
 

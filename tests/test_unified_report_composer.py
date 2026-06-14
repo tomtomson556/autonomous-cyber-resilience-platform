@@ -4,6 +4,7 @@ from copy import deepcopy
 import pytest
 
 from src.tools.unified_report_composer import compose_unified_reports, main
+from src.tools.unified_report_validator import validate_unified_report
 
 
 def unified_report(
@@ -90,6 +91,25 @@ def test_result_is_independent_of_input_order():
     assert forward == reverse
 
 
+def test_composed_report_passes_central_validation():
+    result = compose_unified_reports(
+        [
+            unified_report("a", finding_status="UNKNOWN"),
+            unified_report("b", finding_status="FAIL"),
+        ]
+    )
+
+    assert validate_unified_report(result)["report"] is result
+
+
+def test_invalid_input_reference_is_rejected_before_composition():
+    invalid = unified_report("a", finding_status="UNKNOWN")
+    invalid["findings"][0]["asset_id"] = "unknown-asset"
+
+    with pytest.raises(ValueError, match="references unknown identifier"):
+        compose_unified_reports([invalid, unified_report("b")])
+
+
 def test_equal_timestamp_instants_are_independent_of_input_order():
     first = unified_report("a", timestamp="2026-06-12T10:00:00Z")
     second = unified_report("b", timestamp="2026-06-12T10:00:00+00:00")
@@ -112,6 +132,8 @@ def test_duplicate_ids_are_rejected(collection_name, id_field):
     first = unified_report("a", finding_status="UNKNOWN")
     second = unified_report("b", finding_status="UNKNOWN")
     second[collection_name][0][id_field] = first[collection_name][0][id_field]
+    if collection_name == "assets":
+        second["findings"][0]["asset_id"] = first["assets"][0]["asset_id"]
 
     with pytest.raises(ValueError, match=f"Duplicate {id_field}"):
         compose_unified_reports([first, second])
@@ -143,9 +165,9 @@ def test_missing_schema_version_is_rejected():
 
 @pytest.mark.parametrize(
     "timestamp",
-    ["not-a-timestamp", "2026-06-12T10:00:00"],
+    ["not-a-timestamp", "2026-06-12T10:00:00", "2026-06-12T10:00:00+05:00"],
 )
-def test_invalid_or_offset_free_timestamp_is_rejected(timestamp):
+def test_invalid_or_non_utc_timestamp_is_rejected(timestamp):
     invalid = unified_report("a", timestamp=timestamp)
 
     with pytest.raises(ValueError, match="timestamp"):

@@ -3,18 +3,14 @@ import hashlib
 import json
 import sys
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 
+from src.tools.unified_report_validator import UNIFIED_REPORT_TYPE
+from src.tools.unified_report_validator import UNIFIED_SCHEMA_VERSION
+from src.tools.unified_report_validator import validate_unified_report
 
-UNIFIED_SCHEMA_VERSION = "1.0.0"
-UNIFIED_REPORT_TYPE = "unified_resilience_report"
 COMPOSER_NAME = "unified_report_composer"
 
-VALID_OVERALL_STATUSES = frozenset(
-    {"HEALTHY", "INCOMPLETE", "AT_RISK", "CRITICAL"}
-)
-VALID_FINDING_STATUSES = frozenset({"PASS", "FAIL", "UNKNOWN"})
 STATUS_PRIORITY = {
     "HEALTHY": 0,
     "INCOMPLETE": 1,
@@ -24,130 +20,9 @@ STATUS_PRIORITY = {
 
 
 def _require_non_empty_string(value: object, field_name: str) -> str:
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Unified report field '{field_name}' must be a non-empty string.")
     return value
-
-
-def _parse_timestamp(value: object) -> datetime:
-    timestamp = _require_non_empty_string(value, "timestamp")
-    try:
-        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-    except ValueError as error:
-        raise ValueError("Unified report timestamp must be valid ISO 8601.") from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError("Unified report timestamp must include a UTC offset.")
-    return parsed
-
-
-def _require_list(report: dict, field_name: str, *, non_empty: bool = False) -> list:
-    value = report.get(field_name)
-    if not isinstance(value, list) or (non_empty and not value):
-        requirement = "a non-empty list" if non_empty else "a list"
-        raise ValueError(f"Unified report field '{field_name}' must be {requirement}.")
-    return value
-
-
-def _validate_identified_entries(
-    entries: list,
-    collection_name: str,
-    id_field: str,
-) -> list[str]:
-    identifiers = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            raise ValueError(f"Unified report field '{collection_name}' must contain objects.")
-        identifiers.append(
-            _require_non_empty_string(
-                entry.get(id_field),
-                f"{collection_name}.{id_field}",
-            )
-        )
-    return identifiers
-
-
-def _validate_findings(findings: list) -> list[str]:
-    finding_ids = _validate_identified_entries(findings, "findings", "finding_id")
-    for finding in findings:
-        status = finding.get("status")
-        if status not in VALID_FINDING_STATUSES:
-            raise ValueError(f"Unified finding '{finding['finding_id']}' status is invalid.")
-        confirmed = finding.get("confirmed_vulnerability")
-        if not isinstance(confirmed, bool):
-            raise ValueError(
-                f"Unified finding '{finding['finding_id']}' "
-                "confirmed_vulnerability must be a boolean."
-            )
-        if status == "UNKNOWN" and confirmed:
-            raise ValueError(
-                f"Unified finding '{finding['finding_id']}' cannot confirm UNKNOWN evidence."
-            )
-    return finding_ids
-
-
-def _validate_recommended_actions(actions: list) -> list[str]:
-    action_ids = []
-    for action in actions:
-        if not isinstance(action, dict):
-            raise ValueError("Unified report field 'recommended_actions' must contain objects.")
-        if "action_id" in action:
-            action_ids.append(
-                _require_non_empty_string(
-                    action["action_id"],
-                    "recommended_actions.action_id",
-                )
-            )
-    return action_ids
-
-
-def _validate_report(report: object) -> dict:
-    if not isinstance(report, dict):
-        raise ValueError("Unified report must be an object.")
-
-    schema_version = report.get("schema_version")
-    if schema_version is None:
-        raise ValueError("Unified report schema_version is required.")
-    if schema_version != UNIFIED_SCHEMA_VERSION:
-        raise ValueError(
-            f"Unsupported Unified report schema_version: {schema_version}"
-        )
-
-    if report.get("report_type") != UNIFIED_REPORT_TYPE:
-        raise ValueError(
-            f"Unified report_type must be '{UNIFIED_REPORT_TYPE}'."
-        )
-
-    parsed_timestamp = _parse_timestamp(report.get("timestamp"))
-    platform = _require_non_empty_string(report.get("platform"), "platform")
-    data_classification = _require_non_empty_string(
-        report.get("data_classification"),
-        "data_classification",
-    )
-
-    overall_status = report.get("overall_resilience_status")
-    if overall_status not in VALID_OVERALL_STATUSES:
-        raise ValueError("Unified report overall_resilience_status is invalid.")
-
-    evidence_sources = _require_list(report, "evidence_sources", non_empty=True)
-    assets = _require_list(report, "assets", non_empty=True)
-    findings = _require_list(report, "findings")
-    recommended_actions = _require_list(report, "recommended_actions")
-
-    return {
-        "report": report,
-        "parsed_timestamp": parsed_timestamp,
-        "platform": platform,
-        "data_classification": data_classification,
-        "overall_status": overall_status,
-        "source_ids": _validate_identified_entries(
-            evidence_sources,
-            "evidence_sources",
-            "source_id",
-        ),
-        "asset_ids": _validate_identified_entries(assets, "assets", "asset_id"),
-        "finding_ids": _validate_findings(findings),
-        "action_ids": _validate_recommended_actions(recommended_actions),
-    }
 
 
 def _canonical_json(value: object) -> str:
@@ -182,7 +57,7 @@ def compose_unified_reports(
     if not isinstance(reports, list) or len(reports) < 2:
         raise ValueError("At least two Unified Resilience Reports are required.")
 
-    validated_reports = [_validate_report(report) for report in reports]
+    validated_reports = [validate_unified_report(report) for report in reports]
     if input_identifiers is None:
         identifiers = [_stable_report_identifier(report) for report in reports]
     else:
@@ -265,7 +140,7 @@ def compose_unified_reports(
         )
     ]
 
-    return {
+    composed_report = {
         "schema_version": UNIFIED_SCHEMA_VERSION,
         "timestamp": max(
             validated_reports,
@@ -290,6 +165,8 @@ def compose_unified_reports(
         "findings": sorted(findings, key=lambda item: item["finding_id"]),
         "recommended_actions": sorted(recommended_actions, key=_canonical_json),
     }
+    validate_unified_report(composed_report)
+    return composed_report
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
