@@ -245,3 +245,7 @@ crash.*.log
 
 # Generated Reports
 reports/
+
+# Local AI tool working directories
+.agents/
+.codex/
