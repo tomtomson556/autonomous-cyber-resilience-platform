@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 
 import pytest
@@ -119,6 +120,55 @@ def test_invalid_overall_status_is_rejected():
 
     with pytest.raises(ValueError, match="overall_resilience_status is invalid"):
         validate_unified_report(report)
+
+
+@pytest.mark.parametrize(
+    ("location", "field_path"),
+    [
+        ("overall", "overall_resilience_status"),
+        ("source", "evidence_sources[0].status"),
+        ("finding", "findings[0].status"),
+    ],
+)
+def test_non_string_statuses_are_rejected_with_value_error(location, field_path):
+    report = valid_report()
+    if location == "overall":
+        report["overall_resilience_status"] = []
+    elif location == "source":
+        report["evidence_sources"][0]["status"] = []
+    else:
+        report["findings"][0]["status"] = []
+
+    with pytest.raises(ValueError, match=re.escape(field_path)):
+        validate_unified_report(report)
+
+
+def test_action_unknown_evidence_source_list_reference_is_rejected():
+    report = valid_report()
+    report["recommended_actions"][0]["evidence_source_ids"] = ["unknown-source"]
+
+    with pytest.raises(ValueError, match="references unknown identifier"):
+        validate_unified_report(report)
+
+
+def test_action_nested_unknown_asset_reference_is_rejected():
+    report = valid_report()
+    report["recommended_actions"][0]["parameters"] = {"asset_id": "unknown-asset"}
+
+    with pytest.raises(ValueError, match="references unknown identifier"):
+        validate_unified_report(report)
+
+
+def test_action_open_status_metadata_is_accepted():
+    report = valid_report()
+    report["recommended_actions"][0]["status"] = "PENDING"
+    report["recommended_actions"][0]["parameters"] = {
+        "asset_id": "asset-validator",
+        "finding_id": "finding-validator",
+        "evidence_source_ids": ["source-validator"],
+    }
+
+    validate_unified_report(report)
 
 
 @pytest.mark.parametrize(

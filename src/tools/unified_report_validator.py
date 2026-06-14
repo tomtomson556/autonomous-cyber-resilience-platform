@@ -28,8 +28,25 @@ REQUIRED_FINDING_FIELDS = frozenset(
 )
 SOURCE_REFERENCE_FIELDS = frozenset({"source_id", "evidence_source_id"})
 SOURCE_REFERENCE_LIST_FIELDS = frozenset({"evidence_source_ids"})
-ACTION_REFERENCE_FIELDS = frozenset(
-    {"asset_id", "finding_id", "source_id", "evidence_source_id"}
+ACTION_REFERENCE_FIELDS = {
+    "asset_id": "asset",
+    "finding_id": "finding",
+    "source_id": "source",
+    "evidence_source_id": "source",
+}
+ACTION_REFERENCE_LIST_FIELDS = {
+    "evidence_source_ids": "source",
+}
+KNOWN_ASSET_EVIDENCE_FIELDS = frozenset(
+    {
+        "backup_job",
+        "immutability_evidence",
+        "restore_test_evidence",
+        "rpo_evaluation",
+        "rto_evaluation",
+        "source_evidence",
+        "successful_backup_session",
+    }
 )
 TIMESTAMP_FIELD_NAMES = frozenset({"timestamp", "last_successful_backup", "created_at"})
 
@@ -71,14 +88,26 @@ def _parse_utc_timestamp(value: object, field_name: str) -> datetime:
     return parsed
 
 
+def _validate_allowed_status(
+    value: object,
+    field_name: str,
+    allowed_statuses: frozenset[str],
+    *,
+    invalid_message: str | None = None,
+) -> None:
+    if not isinstance(value, str):
+        raise ValueError(f"Unified report field '{field_name}' status must be a string.")
+    if value not in allowed_statuses:
+        raise ValueError(
+            invalid_message
+            or f"Unified report field '{field_name}' has an invalid status."
+        )
+
+
 def _validate_embedded_contract(value: object, field_name: str) -> None:
     if isinstance(value, dict):
         for key, nested_value in value.items():
             nested_field = f"{field_name}.{key}" if field_name else key
-            if key == "status" and nested_value not in VALID_EVIDENCE_STATUSES:
-                raise ValueError(
-                    f"Unified report field '{nested_field}' has an invalid status."
-                )
             if (
                 key in TIMESTAMP_FIELD_NAMES or key.endswith("_at")
             ) and nested_value is not None:
@@ -87,6 +116,27 @@ def _validate_embedded_contract(value: object, field_name: str) -> None:
     elif isinstance(value, list):
         for index, nested_value in enumerate(value):
             _validate_embedded_contract(nested_value, f"{field_name}[{index}]")
+
+
+def _validate_known_asset_evidence_statuses(asset: dict, field_name: str) -> None:
+    for evidence_field in KNOWN_ASSET_EVIDENCE_FIELDS & asset.keys():
+        evidence = asset[evidence_field]
+        if isinstance(evidence, dict) and "status" in evidence:
+            _validate_allowed_status(
+                evidence["status"],
+                f"{field_name}.{evidence_field}.status",
+                VALID_EVIDENCE_STATUSES,
+            )
+
+    security_checks = asset.get("security_checks")
+    if isinstance(security_checks, dict):
+        for check_name, check in security_checks.items():
+            if isinstance(check, dict) and "status" in check:
+                _validate_allowed_status(
+                    check["status"],
+                    f"{field_name}.security_checks.{check_name}.status",
+                    VALID_EVIDENCE_STATUSES,
+                )
 
 
 def _validate_unique_ids(
@@ -158,6 +208,47 @@ def _validate_nested_source_references(
             )
 
 
+def _validate_nested_action_references(
+    value: object,
+    field_name: str,
+    reference_ids: dict[str, set[str]],
+) -> None:
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            nested_field = f"{field_name}.{key}"
+            reference_type = ACTION_REFERENCE_FIELDS.get(key)
+            if reference_type is not None:
+                _validate_reference(
+                    nested_value,
+                    nested_field,
+                    reference_ids[reference_type],
+                )
+            list_reference_type = ACTION_REFERENCE_LIST_FIELDS.get(key)
+            if list_reference_type is not None:
+                if not isinstance(nested_value, list):
+                    raise ValueError(
+                        f"Unified report field '{nested_field}' must be a list."
+                    )
+                for index, identifier in enumerate(nested_value):
+                    _validate_reference(
+                        identifier,
+                        f"{nested_field}[{index}]",
+                        reference_ids[list_reference_type],
+                    )
+            _validate_nested_action_references(
+                nested_value,
+                nested_field,
+                reference_ids,
+            )
+    elif isinstance(value, list):
+        for index, nested_value in enumerate(value):
+            _validate_nested_action_references(
+                nested_value,
+                f"{field_name}[{index}]",
+                reference_ids,
+            )
+
+
 def validate_unified_report(report: object) -> dict:
     """Validate one Unified Resilience Report without modifying it."""
     if not isinstance(report, dict):
@@ -180,8 +271,12 @@ def validate_unified_report(report: object) -> dict:
         "data_classification",
     )
     overall_status = report.get("overall_resilience_status")
-    if overall_status not in VALID_OVERALL_STATUSES:
-        raise ValueError("Unified report overall_resilience_status is invalid.")
+    _validate_allowed_status(
+        overall_status,
+        "overall_resilience_status",
+        VALID_OVERALL_STATUSES,
+        invalid_message="Unified report overall_resilience_status is invalid.",
+    )
 
     evidence_sources = _require_list(report, "evidence_sources", non_empty=True)
     assets = _require_list(report, "assets", non_empty=True)
@@ -204,11 +299,11 @@ def validate_unified_report(report: object) -> dict:
             source["reference"],
             f"evidence_sources[{index}].reference",
         )
-        if source["status"] not in VALID_EVIDENCE_STATUSES:
-            raise ValueError(
-                f"Unified report field 'evidence_sources[{index}].status' "
-                "has an invalid status."
-            )
+        _validate_allowed_status(
+            source["status"],
+            f"evidence_sources[{index}].status",
+            VALID_EVIDENCE_STATUSES,
+        )
         _parse_utc_timestamp(
             source["collected_at"],
             f"evidence_sources[{index}].collected_at",
@@ -230,6 +325,7 @@ def validate_unified_report(report: object) -> dict:
                     f"Unified report field 'assets[{index}].{field_name}' "
                     "must be an object or null."
                 )
+        _validate_known_asset_evidence_statuses(asset, f"assets[{index}]")
 
     for index, finding in enumerate(findings):
         if not isinstance(finding, dict):
@@ -237,10 +333,11 @@ def validate_unified_report(report: object) -> dict:
         _require_fields(finding, REQUIRED_FINDING_FIELDS, f"findings[{index}]")
         _require_non_empty_string(finding["category"], f"findings[{index}].category")
         _require_non_empty_string(finding["message"], f"findings[{index}].message")
-        if finding["status"] not in VALID_EVIDENCE_STATUSES:
-            raise ValueError(
-                f"Unified report field 'findings[{index}].status' has an invalid status."
-            )
+        _validate_allowed_status(
+            finding["status"],
+            f"findings[{index}].status",
+            VALID_EVIDENCE_STATUSES,
+        )
         if finding["reason"] is not None:
             _require_non_empty_string(finding["reason"], f"findings[{index}].reason")
         if not isinstance(finding["confirmed_vulnerability"], bool):
@@ -274,19 +371,17 @@ def validate_unified_report(report: object) -> dict:
             asset_ids,
         )
         _validate_nested_source_references(finding, f"findings[{index}]", source_ids)
+    action_reference_ids = {
+        "asset": asset_ids,
+        "finding": finding_ids,
+        "source": source_ids,
+    }
     for index, action in enumerate(recommended_actions):
-        for reference_field in ACTION_REFERENCE_FIELDS & action.keys():
-            valid_ids = {
-                "asset_id": asset_ids,
-                "finding_id": finding_ids,
-                "source_id": source_ids,
-                "evidence_source_id": source_ids,
-            }[reference_field]
-            _validate_reference(
-                action[reference_field],
-                f"recommended_actions[{index}].{reference_field}",
-                valid_ids,
-            )
+        _validate_nested_action_references(
+            action,
+            f"recommended_actions[{index}]",
+            action_reference_ids,
+        )
 
     _validate_embedded_contract(report, "")
 
