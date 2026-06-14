@@ -44,7 +44,11 @@ and a separately approved manual operations process.
 
 The future migration cannot begin until all of the following are satisfied:
 
-- PR #56 remote-state readiness changes are present.
+- The remote-state readiness baseline introduced through PR #56 is present:
+  the root Terraform module requires Terraform `>= 1.10.0`, the
+  [Terraform remote state hardening runbook](terraform-remote-state-hardening.md)
+  exists, and no active S3 backend block is enabled in the root Terraform
+  module before the future migration process.
 - Every operator and automation environment is verified to use Terraform
   `>= 1.10.0`.
 - Only the default Terraform workspace is in scope. Any non-default workspace
@@ -67,7 +71,7 @@ migration begins.
 | Decision | Unresolved value | Owner | Approval |
 | --- | --- | --- | --- |
 | AWS account ID | `TBD_ACCOUNT_ID` | `TBD` | `TBD` |
-| AWS region | `TBD_REGION` | `TBD` | `TBD` |
+| AWS region | Expected: `eu-central-1`; deviation requires documented approval | `TBD` | `TBD_REGION_DEVIATION_APPROVAL` |
 | S3 state bucket name | `TBD_STATE_BUCKET_NAME` | `TBD` | `TBD` |
 | Backend key path | `TBD_BACKEND_KEY` | `TBD` | `TBD` |
 | KMS key model | `TBD_KMS_KEY_MODEL` | `TBD` | `TBD` |
@@ -98,8 +102,10 @@ The approved target design must:
   must not be able to delete the bucket, alter bucket policy, suspend
   versioning, change encryption, disable the KMS key, schedule KMS key deletion,
   or bypass audit controls.
-- Deny the normal deployer role `s3:DeleteObject` and
-  `s3:DeleteObjectVersion` on the real state object and its versions.
+- Do not grant the normal deployer role `s3:DeleteObject` or
+  `s3:DeleteObjectVersion` on the real state object or its versions. Whether
+  this is enforced through omission-only least privilege, explicit deny, or
+  both is a future implementation decision that must be reviewed.
 - Grant `s3:DeleteObject` only on the matching `.tflock` object where required
   for lockfile cleanup.
 - Grant only narrowly scoped S3 and KMS data-plane permissions required for
@@ -125,6 +131,8 @@ be limited to:
 - `kms:DescribeKey` only if the approved operational verification requires it.
 
 The final IAM and KMS key policies must be independently reviewed before use.
+They must not be treated as implemented until that future review and
+deployment are complete.
 
 ### Break-glass role
 
