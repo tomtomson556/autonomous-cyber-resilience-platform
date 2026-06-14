@@ -40,23 +40,25 @@ existing Terraform root.
 | --- | --- | --- | --- |
 | Circular dependency risk | Low when its initial state is independently protected | Low; no Terraform backend dependency | Low; no Terraform backend dependency |
 | Authoritative configuration | Reviewed Terraform configuration in a dedicated root | Reviewed CloudFormation template | Approved procedure and decision record |
-| Bootstrap state | Initially local and separately protected; later disposition requires approval | CloudFormation stack state managed by AWS | No tool state; evidence and approved configuration record are authoritative |
+| Bootstrap state | Initially local and separately protected; later disposition requires approval | AWS-managed stack state reduces local Terraform-state exposure but does not remove stack recovery risk | No tool state; evidence and approved configuration record are authoritative |
 | State/configuration protection | Restricted external storage, ownership, retention, and audit controls | Template protection plus restricted stack and account permissions | Restricted procedure, evidence, and access-controlled records |
 | Reproducibility | High | High | Lower and operator-dependent |
 | Reviewability | High and aligned with existing Terraform skills | High, but introduces another infrastructure language | Moderate; depends on procedure and evidence quality |
 | Drift detection | Requires an approved bootstrap-root drift process | CloudFormation drift detection plus approved review process | Requires separate detective controls and reconciliation |
-| Recovery complexity | Moderate; recover bootstrap state or reconstruct under approval | Moderate; recover or reconcile stack and template | Higher; reconstruct from approved records and evidence |
+| Recovery complexity | Moderate; recover bootstrap state or reconstruct under approval | Moderate; recover or reconcile stack, template, retained resources, and permissions | Higher; reconstruct from approved records and evidence |
 | Permission isolation | Strong when separate identities and lifecycle controls are enforced | Strong when stack administration is isolated | Strong only with tightly controlled operator access |
 | Operational effort | Moderate | Moderate | Low initially, higher for repeatability and recovery |
 | Dependencies and failure risks | Terraform tooling and protected bootstrap-state custody | CloudFormation expertise and stack availability | Human error, incomplete evidence, and procedural drift |
 | Audit approach | Version control plus bootstrap-state and API activity audit | Version control plus stack and API activity audit | Approval records, API activity audit, and retained evidence |
-| Residual risks | Protected local bootstrap state remains a sensitive dependency | Split toolchain and stack-level administrative risk | Weakest reproducibility and highest operator dependence |
+| Residual risks | Protected local bootstrap state remains a sensitive dependency | Split toolchain, stack deletion, template custody, retention, administrative permissions, and recovery risk | Weakest reproducibility and highest operator dependence |
 
 ## Recommended option
 
-Adopt a **separate bootstrap lifecycle**, preferably a dedicated Terraform
-bootstrap root or an approved equivalent method. The final method remains
-pending approval.
+Adopt a **separate bootstrap lifecycle**. The concrete bootstrap method remains
+pending approval until bootstrap-state or authoritative-configuration custody,
+recovery, ownership, and approval responsibilities are resolved. A separate
+Terraform bootstrap root, CloudFormation, and a controlled manual procedure
+remain candidate methods.
 
 The approved design must:
 
@@ -68,16 +70,22 @@ The approved design must:
 - Preserve native S3 lockfile locking with `use_lockfile = true` for the future
   application backend and introduce no new DynamoDB locking design.
 
-This recommendation does not authorize implementation. This PR performs no
-`terraform apply` and adds no backend block to the existing root module.
+This architecture decision does not authorize Terraform execution,
+implementation, or a backend block in the existing root module. No bootstrap
+code or template PR may begin until the method, state or configuration custody,
+owner, recovery process, and required approvals are finalized.
 
 ## Alternatives and tradeoffs
 
 CloudFormation remains a viable equivalent when the organization accepts a
 second infrastructure language and assigns stack ownership, drift detection,
-and recovery responsibilities. A controlled manual procedure remains possible
-for a narrowly scoped one-time bootstrap, but it has weaker reproducibility and
-greater dependence on operator evidence and discipline.
+and recovery responsibilities. AWS-managed stack state reduces exposure to
+local Terraform state, but it does not automatically resolve stack deletion,
+template custody, termination protection, resource `Retain` policies,
+administrative stack permissions, or the recovery process. A controlled manual
+procedure remains possible for a narrowly scoped one-time bootstrap, but it has
+weaker reproducibility and greater dependence on operator evidence and
+discipline.
 
 No option is considered implemented until its ownership, protection, recovery,
 audit, and approval model is resolved.
@@ -88,7 +96,7 @@ audit, and approval model is resolved.
 | --- | --- | --- | --- | --- |
 | Existing AWS account or separate control-plane account | Prefer stronger lifecycle and permission isolation | `TBD` | `TBD` | `TBD` |
 | Ownership and responsibility | Assign a dedicated control-plane owner | `TBD` | `TBD` | `TBD` |
-| Final bootstrap method | Separate Terraform bootstrap root or approved equivalent | `TBD` | `TBD` | `TBD` |
+| Final bootstrap method | Select only after custody, recovery, ownership, and approval review | `TBD` | `TBD` | `TBD` |
 | Bootstrap state or authoritative configuration custody | External, access-controlled, recoverable, and audited | `TBD` | `TBD` | `TBD` |
 | Normal deployment role | Separate least-privilege identity | `TBD` | `TBD` | `TBD` |
 | Break-glass role | Separate, protected, short-lived, and audited | `TBD` | `TBD` | `TBD` |
@@ -107,8 +115,9 @@ audit, and approval model is resolved.
 
 ## Follow-up PRs
 
-1. Add bootstrap code or an approved bootstrap template only after this
-   decision is approved.
+1. Add bootstrap code or an approved bootstrap template only after the method,
+   state or configuration custody, owner, recovery process, and approvals are
+   finalized.
 2. Specify KMS and IAM least-privilege details based on the final bootstrap
    decision.
 3. Perform the operational migration only through a separate, manually approved
