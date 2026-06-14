@@ -28,11 +28,11 @@ Before recommending push, PR creation, or merge, verify:
 * `git diff --check` passed
 * documentation matches implementation
 * commit history is understandable
-* no generated, local, secret, cache, provider, state, report, or ZIP artifacts are included
+* no generated, local, secret, cache, provider, state, locally generated runtime reports under `reports/`, or ZIP artifacts are included
 
 ## Required safety checks
 
-Flag the branch as **not merge-ready** if any of the following are present without explicit user approval:
+Flag the branch as **not merge-ready** if any of the following artifacts are present (these are absolute blockers with no approval exception):
 
 * secrets
 * `.env` files
@@ -48,6 +48,9 @@ Flag the branch as **not merge-ready** if any of the following are present witho
 * `.codex/`
 * unrelated local tool files
 * AWS provider binaries
+
+Flag the branch as **not safe to proceed** if any of the following are present without explicit user approval:
+
 * broad destructive cleanup commands
 * `git clean`
 * Git history rewrites

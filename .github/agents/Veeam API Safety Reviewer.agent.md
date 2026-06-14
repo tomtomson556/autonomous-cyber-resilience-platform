@@ -49,7 +49,7 @@ Flag as unsafe unless explicitly requested and reviewed:
 * bypassing evidence report validation
 * broad or undocumented endpoint access
 
-Do not implement productive HTTPS transport unless the contract, endpoint mapping, pagination, auth/session model, and validation are already strengthened.
+Flag productive HTTPS transport as unsafe unless the contract, endpoint mapping, pagination, auth/session model, and validation are already strengthened and the user explicitly approved productive integration work.
 
 ## Expected safe patterns
 
