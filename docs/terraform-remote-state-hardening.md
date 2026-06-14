@@ -13,6 +13,11 @@ must be run only after explicit approval, with an identified authoritative
 state source, an independently verified backup, and exclusive control of
 Terraform activity.
 
+Use the
+[Terraform S3 remote state migration specification](terraform-s3-remote-state-migration-spec.md)
+to record unresolved decisions, approvals, responsibilities, and future
+Go/No-Go gates before any migration is authorized.
+
 Do not print, parse, commit, or expose Terraform state while following this
 runbook. State can contain sensitive values even when the corresponding
 Terraform outputs are marked sensitive.
