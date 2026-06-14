@@ -27,7 +27,9 @@ REQUIRED_FINDING_FIELDS = frozenset(
     }
 )
 SOURCE_REFERENCE_FIELDS = frozenset({"source_id", "evidence_source_id"})
-SOURCE_REFERENCE_LIST_FIELDS = frozenset({"evidence_source_ids"})
+SOURCE_REFERENCE_LIST_FIELDS = frozenset(
+    {"evidence_source_ids", "source_ids", "source_evidence_ids"}
+)
 ACTION_REFERENCE_FIELDS = {
     "asset_id": "asset",
     "finding_id": "finding",
@@ -111,6 +113,11 @@ def _validate_allowed_status(
 def _validate_embedded_contract(value: object, field_name: str) -> None:
     if isinstance(value, dict):
         for key, nested_value in value.items():
+            if not isinstance(key, str):
+                location = field_name or "<root>"
+                raise ValueError(
+                    f"Unified report field '{location}' must contain string keys."
+                )
             nested_field = f"{field_name}.{key}" if field_name else key
             if (
                 key in TIMESTAMP_FIELD_NAMES or key.endswith("_at")
@@ -192,9 +199,9 @@ def _validate_nested_source_references(
             if key in SOURCE_REFERENCE_FIELDS:
                 _validate_reference(nested_value, nested_field, source_ids)
             if key in SOURCE_REFERENCE_LIST_FIELDS:
-                if not isinstance(nested_value, list):
+                if not isinstance(nested_value, list) or not nested_value:
                     raise ValueError(
-                        f"Unified report field '{nested_field}' must be a list."
+                        f"Unified report field '{nested_field}' must be a non-empty list."
                     )
                 for index, identifier in enumerate(nested_value):
                     _validate_reference(
@@ -380,6 +387,14 @@ def validate_unified_report(report: object) -> dict:
         "finding": finding_ids,
         "source": source_ids,
     }
+    for index, asset in enumerate(assets):
+        recommended_action = asset["recommended_action"]
+        if isinstance(recommended_action, dict):
+            _validate_nested_action_references(
+                recommended_action,
+                f"assets[{index}].recommended_action",
+                action_reference_ids,
+            )
     for index, action in enumerate(recommended_actions):
         _validate_nested_action_references(
             action,

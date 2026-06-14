@@ -42,6 +42,37 @@ def test_optional_reference_fields_remain_optional():
 
 
 @pytest.mark.parametrize(
+    ("location", "field_name"),
+    [
+        ("asset", "source_ids"),
+        ("asset", "source_evidence_ids"),
+        ("finding", "source_ids"),
+        ("finding", "source_evidence_ids"),
+    ],
+)
+def test_unknown_asset_and_finding_source_list_references_are_rejected(
+    location,
+    field_name,
+):
+    report = valid_report()
+    target = report["assets"][0] if location == "asset" else report["findings"][0]
+    target[field_name] = ["unknown-source"]
+
+    with pytest.raises(ValueError, match=rf"{field_name}\[0\].*unknown identifier"):
+        validate_unified_report(report)
+
+
+@pytest.mark.parametrize("location", ["asset", "finding"])
+def test_empty_asset_and_finding_source_reference_lists_are_rejected(location):
+    report = valid_report()
+    target = report["assets"][0] if location == "asset" else report["findings"][0]
+    target["evidence_source_ids"] = []
+
+    with pytest.raises(ValueError, match="evidence_source_ids.*non-empty list"):
+        validate_unified_report(report)
+
+
+@pytest.mark.parametrize(
     ("location", "field_name", "unknown_value"),
     [
         ("asset", "evidence_source_id", "unknown-source"),
@@ -226,6 +257,45 @@ def test_action_open_status_metadata_is_accepted():
     }
 
     validate_unified_report(report)
+
+
+@pytest.mark.parametrize(
+    "recommended_action",
+    [
+        {"asset_id": "unknown-asset"},
+        {"finding_id": "unknown-finding"},
+        {"asset_ids": ["unknown-asset"]},
+        {"parameters": {"finding_ids": ["unknown-finding"]}},
+    ],
+)
+def test_asset_recommended_action_unknown_references_are_rejected(
+    recommended_action,
+):
+    report = valid_report()
+    report["assets"][0]["recommended_action"] = recommended_action
+
+    with pytest.raises(ValueError, match="references unknown identifier"):
+        validate_unified_report(report)
+
+
+def test_asset_recommended_action_open_status_metadata_is_accepted():
+    report = valid_report()
+    report["assets"][0]["recommended_action"] = {
+        "status": "PENDING",
+        "asset_id": "asset-validator",
+        "finding_id": "finding-validator",
+        "parameters": {"evidence_source_ids": ["source-validator"]},
+    }
+
+    validate_unified_report(report)
+
+
+def test_non_string_open_metadata_key_is_rejected_with_value_error():
+    report = valid_report()
+    report["open_metadata"] = {1: "value"}
+
+    with pytest.raises(ValueError, match="open_metadata.*string keys"):
+        validate_unified_report(report)
 
 
 @pytest.mark.parametrize(
