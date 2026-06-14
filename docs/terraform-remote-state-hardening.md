@@ -17,6 +17,9 @@ Use the
 [Terraform S3 remote state migration specification](terraform-s3-remote-state-migration-spec.md)
 to record unresolved decisions, approvals, responsibilities, and future
 Go/No-Go gates before any migration is authorized.
+Use the
+[Terraform state bootstrap architecture decision](terraform-state-bootstrap-architecture-decision.md)
+to approve the separate bootstrap lifecycle before implementation.
 
 Do not print, parse, commit, or expose Terraform state while following this
 runbook. State can contain sensitive values even when the corresponding

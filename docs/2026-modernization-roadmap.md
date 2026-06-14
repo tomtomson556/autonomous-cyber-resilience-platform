@@ -158,6 +158,8 @@ select, authorize, or execute critical runbooks independently.
   [Terraform remote state hardening runbook](terraform-remote-state-hardening.md);
   record future migration decisions in the
   [Terraform S3 remote state migration specification](terraform-s3-remote-state-migration-spec.md);
+  approve the separate bootstrap lifecycle through the
+  [Terraform state bootstrap architecture decision](terraform-state-bootstrap-architecture-decision.md);
   productive migration remains a separately approved operations-hardening step.
 
 ## Apply notes
