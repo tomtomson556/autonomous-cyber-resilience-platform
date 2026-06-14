@@ -22,14 +22,14 @@ Terraform outputs are marked sensitive.
 - The main Terraform root module manages the S3 lab/application bucket. The
   remote-state bucket must be a different bucket with an independent lifecycle.
 - The checked-in Terraform configuration contains no backend block.
-- No checked-in Terraform workspace configuration or documented workspace
-  operating model was found. This does not prove that workspaces have never
-  been used locally.
-- The Terraform configuration currently allows Terraform `>= 1.5.0`. Native S3
+- No checked-in Terraform workspace configuration was found. This project must
+  use only the default workspace unless a separate workspace design is reviewed
+  and approved before use. This does not prove that workspaces have never been
+  used locally.
+- The Terraform configuration requires Terraform `>= 1.10.0`. Native S3
   lockfile locking with `use_lockfile` was introduced as experimental in
-  Terraform `1.10`; all operators and automation must therefore use Terraform
-  `>= 1.10` before this design is adopted. Changing the project's
-  `required_version` is outside this documentation-only change.
+  Terraform `1.10`; all operators, CI jobs, and other automation must therefore
+  use Terraform `>= 1.10.0` before this design is adopted.
 - The existing `.gitignore` excludes `.terraform/`, `*.tfstate`,
   `*.tfstate.backup`, `*.tfvars`, `.env`, and `reports/`. ZIP archives are not
   globally ignored. No ignore rule was changed because globally excluding ZIP
@@ -51,10 +51,8 @@ Use a dedicated S3 bucket only for Terraform state:
   `<account-id>-eu-central-1-acrp-tfstate` or
   `acrp-terraform-state-eu-central-1-<unique-suffix>`.
 - Enable S3 Versioning before writing state.
-- Enable server-side encryption. SSE-S3 is the lowest-cost baseline. SSE-KMS
-  with a customer-managed KMS key and key rotation is an optional stronger
-  control when its additional key-policy, availability, and cost requirements
-  are understood.
+- Enable SSE-KMS with a customer-managed KMS key and key rotation after its
+  additional key-policy, availability, and cost requirements are reviewed.
 - Consider an S3 Bucket Key when using SSE-KMS to reduce KMS request traffic
   and cost. Review the changed encryption context before enabling it.
 - Fully enable S3 Block Public Access.
@@ -92,8 +90,9 @@ terraform {
 }
 ```
 
-For an approved SSE-KMS design, the reviewed configuration may additionally
-refer to a placeholder KMS key ARN:
+The final approved backend configuration must additionally refer to the full
+customer-managed KMS key ARN, not only an alias. This readiness example uses a
+placeholder:
 
 ```hcl
 kms_key_id = "<customer-managed-kms-key-arn>"
@@ -136,6 +135,10 @@ permanent cleanup complexity, recovery complexity, and the governance or
 compliance overhead required to manage them. Terraform requires
 `s3:DeleteObject` on the `.tflock` object for normal lock cleanup.
 
+Do not use blanket Object Lock default retention for a bucket containing
+`.tflock` files unless a separate reviewed design explicitly handles lock-file
+cleanup and operational recovery.
+
 Versioning plus restrictive IAM delete permissions is the safer baseline for
 this project. Object-level retention for selected, verified state versions may
 be considered only as an advanced manual recovery or audit control with a
@@ -174,60 +177,97 @@ short-lived credentials, and audit notes for every use.
 
 ### KMS permissions
 
-If SSE-KMS is selected, grant only the KMS permissions the reviewed backend
-operation requires, normally:
+For SSE-KMS, grant the backend identity only these required cryptographic
+permissions, narrowly scoped to the exact customer-managed KMS key:
 
 - `kms:Encrypt`
 - `kms:Decrypt`
 - `kms:GenerateDataKey`
-- `kms:DescribeKey`
 
-Scope access to the exact customer-managed KMS key and review both IAM policy
-and key policy. Validate the effective minimum from audited backend activity
-before removing permissions.
+Grant `kms:DescribeKey` separately only when operational verification requires
+it. Review both IAM policy and KMS key policy, and validate the effective
+minimum from audited backend activity before removing permissions.
+
+### Control-plane protection
+
+The normal Terraform deployment identity must not be able to delete the state
+bucket, alter its bucket policy, suspend versioning, change encryption
+settings, delete current or noncurrent state object versions, disable the KMS
+key, schedule KMS key deletion, or bypass audit controls.
+
+Keep administrative recovery or break-glass access separate from normal
+Terraform operations. Protect and audit that access, require explicit approval
+and short-lived credentials, and record every use without exposing state
+contents.
 
 ## Safe migration checklist
 
-The following steps are a controlled migration plan, not commands to run during
-documentation work.
+The following steps describe a future, separately approved manual operations
+process. They are not commands to run during documentation or readiness work.
 
-1. Pause all Terraform activity, including local operators and automation.
-2. Verify the current Git branch and require a clean working tree.
-3. Identify and verify the current authoritative state source without printing
-   or parsing state contents. Do not assume that a local state file is complete
-   or current.
-4. Create an external, access-controlled backup of the recovered or local state
-   file without committing it. Independently verify the backup and recovery
-   ownership.
-5. Bootstrap the dedicated backend bucket, optional KMS key, policies, roles,
+1. Pause all Terraform activity before backup or migration. This gate includes
+   local operators, CI jobs, scheduled drift checks, and every other automation
+   that can read or modify the same infrastructure or state.
+2. **Future manual operator check:** run `terraform version` and confirm that
+   every operator and automation environment uses Terraform `>= 1.10.0`.
+3. Verify that the reviewed branch is active and that the working tree is
+   clean.
+4. Identify and verify the current authoritative state source without printing
+   or parsing state contents. The mere presence of a local `terraform.tfstate`
+   file is not proof that it is complete, current, or authoritative. Complete
+   this step before copying any local state.
+5. Create a sensitive, external backup of the authoritative state without
+   committing it. Future backup commands must first set restrictive permissions
+   such as `umask 077`, and the backup must be stored outside the repository in
+   an access-controlled location. Record a checksum without exposing state
+   contents, and document the backup owner and recovery procedure.
+6. Bootstrap the dedicated backend bucket, KMS key, policies, roles,
    versioning, encryption, and auditing separately from the main Terraform
    stack.
-6. Verify backend controls and wait for newly enabled S3 Versioning to propagate
+7. Verify backend controls and wait for newly enabled S3 Versioning to propagate
    before any state write. AWS recommends waiting 15 minutes after first
    enabling versioning before issuing object writes.
-7. Review and add the backend block only after all preceding controls and
+8. Review and add the backend block only after all preceding controls and
    placeholders have approved values.
-8. **Manual operator step:** run `terraform init -migrate-state` only with
-   explicit approval and exclusive Terraform access.
-9. **Manual operator step:** verify the expected resource addresses with
-   `terraform state list` without exposing state contents.
-10. **Manual operator step:** run `terraform plan -refresh-only` as a
+9. **Future manual operator step:** run `terraform init -migrate-state` only
+   with explicit approval and exclusive Terraform access.
+10. **Future manual operator step:** verify the expected resource addresses with
+    `terraform state list` without exposing state contents.
+11. **Future manual operator step:** run `terraform plan -refresh-only` as a
     conservative verification step. It accesses the backend and may read live
     AWS resources.
-11. **Manual operator step:** after successful refresh-only review, run
+12. **Future manual operator step:** after successful refresh-only review, run
     `terraform plan` and investigate every unexpected change.
-12. Verify native lockfile behavior, state version creation, encryption,
-    least-privilege permissions, audit events, and recovery from a known-good
-    noncurrent version.
-13. Do not run `terraform apply` until state integrity, locking, versioning,
+13. Complete the post-migration verification checklist below.
+14. Do not run `terraform apply` until state integrity, locking, versioning,
     permissions, auditability, and recoverability are independently verified.
-14. Do not remove local state copies until remote-state integrity,
-    recoverability, required retention, and external backups are independently
-    verified and an authorized operator explicitly approves removal.
+15. Do not delete the external backup until remote-state integrity, version
+    retention, locking behavior, and recovery are independently verified and an
+    authorized operator explicitly approves removal.
 
 Record approvals, timestamps, operator identities, source and destination
 locations, verification outcomes, and any unexpected behavior without
 recording state contents or secrets.
+
+## Future post-migration verification checklist
+
+This checklist is documentation for a future approved migration. Do not execute
+these checks as part of documentation or readiness work.
+
+- Confirm that the remote state object exists and uses SSE-KMS with the approved
+  customer-managed KMS key.
+- Confirm that state object versioning is active and that at least one state
+  object version exists after the approved migration.
+- During a future approved locked operation, confirm that the matching
+  `.tflock` object is created and removed.
+- Confirm that concurrent Terraform runs against the same state are blocked.
+- Confirm that the normal Terraform role cannot delete the real state object or
+  any current or noncurrent state object version.
+- Confirm that the external state backup still exists and that its checksum
+  matches the recorded pre-migration checksum.
+- Confirm CloudTrail or equivalent audit visibility for state access.
+- Confirm that recovery from a known-good state version is documented and
+  tested without exposing state contents.
 
 ## Rollback and recovery principles
 
@@ -244,17 +284,17 @@ refresh-only plan before considering normal operations.
 
 ## Workspace design note
 
-This repository does not currently appear to define or document Terraform
-workspaces. This conclusion is based only on checked-in configuration and
-documentation and does not establish the state of any operator's local
-Terraform metadata.
+This project must use only the Terraform default workspace unless a separate
+workspace design is reviewed and approved before use. For the default
+workspace, grant `s3:DeleteObject` only on the matching `.tflock` object and do
+not grant it on the real state object.
 
-If workspaces are introduced, design `key` and `workspace_key_prefix`
-deliberately before use. Keep lab, production, and default-workspace state in
-unambiguous, separately authorized prefixes. HashiCorp documents that the
-default workspace uses the configured `key`, while non-default workspaces add a
-workspace prefix; an accidental prefix design can therefore mix environment
-state or permissions.
+If non-default workspaces are ever introduced, redesign and review the S3 path
+layout and IAM permissions before use. Design `key` and `workspace_key_prefix`
+deliberately, and keep environment state in unambiguous, separately authorized
+prefixes. HashiCorp documents that the default workspace uses the configured
+`key`, while non-default workspaces add a workspace prefix; an accidental
+prefix design can therefore mix environment state or permissions.
 
 ## Official references
 
