@@ -9,19 +9,15 @@ from src.tools.restore_test_evidence import (
     load_restore_test_evidence,
     validate_restore_test_evidence,
 )
+from src.tools.unified_report_validator import validate_unified_report
 
 
 POLICY_SCHEMA_VERSION = "rpo-rto-policy/v1"
 POLICY_REPORT_TYPE = "rpo_rto_policy"
 EVALUATION_SCHEMA_VERSION = "resilience-evaluation-report/v1"
 EVALUATION_REPORT_TYPE = "resilience_evaluation_report"
-UNIFIED_SCHEMA_VERSION = "1.0.0"
-UNIFIED_REPORT_TYPE = "unified_resilience_report"
 EVALUATOR_NAME = "deterministic_rpo_rto_evaluator"
 EVALUATOR_VERSION = "1"
-VALID_UNIFIED_OVERALL_STATUSES = frozenset(
-    {"HEALTHY", "INCOMPLETE", "AT_RISK", "CRITICAL"}
-)
 
 POLICY_FIELDS = frozenset(
     {"schema_version", "report_type", "evaluation_timestamp", "rules"}
@@ -135,54 +131,6 @@ def validate_policy(policy: dict) -> None:
             raise ValueError(f"Duplicate RPO objective for asset_id: {asset_id}")
         policy_ids.add(policy_id)
         asset_ids.add(asset_id)
-
-
-def _validate_unified_report(report: dict) -> tuple[dict[str, dict], set[str]]:
-    if not isinstance(report, dict):
-        raise ValueError("Unified Resilience Report must be an object.")
-    if report.get("schema_version") != UNIFIED_SCHEMA_VERSION:
-        raise ValueError("Unsupported Unified Resilience Report schema_version.")
-    if report.get("report_type") != UNIFIED_REPORT_TYPE:
-        raise ValueError(f"Unified report_type must be '{UNIFIED_REPORT_TYPE}'.")
-    _parse_utc_timestamp(report.get("timestamp"), "timestamp")
-    _require_non_empty_string(report.get("platform"), "platform")
-    _require_non_empty_string(report.get("data_classification"), "data_classification")
-    if report.get("overall_resilience_status") not in VALID_UNIFIED_OVERALL_STATUSES:
-        raise ValueError("Unified report overall_resilience_status is invalid.")
-
-    evidence_sources = report.get("evidence_sources")
-    if not isinstance(evidence_sources, list) or not evidence_sources:
-        raise ValueError(
-            "Unified report field 'evidence_sources' must be a non-empty list."
-        )
-    evidence_source_ids = set()
-    for source in evidence_sources:
-        if not isinstance(source, dict):
-            raise ValueError("Unified report evidence_sources must be objects.")
-        source_id = _require_non_empty_string(
-            source.get("source_id"),
-            "evidence_sources.source_id",
-        )
-        if source_id in evidence_source_ids:
-            raise ValueError(f"Duplicate Unified source_id: {source_id}")
-        evidence_source_ids.add(source_id)
-    for collection_name in ("findings", "recommended_actions"):
-        if not isinstance(report.get(collection_name), list):
-            raise ValueError(f"Unified report field '{collection_name}' must be a list.")
-
-    assets = report.get("assets")
-    if not isinstance(assets, list) or not assets:
-        raise ValueError("Unified report field 'assets' must be a non-empty list.")
-
-    assets_by_id = {}
-    for asset in assets:
-        if not isinstance(asset, dict):
-            raise ValueError("Unified report assets must be objects.")
-        asset_id = _require_non_empty_string(asset.get("asset_id"), "assets.asset_id")
-        if asset_id in assets_by_id:
-            raise ValueError(f"Duplicate Unified asset_id: {asset_id}")
-        assets_by_id[asset_id] = asset
-    return assets_by_id, evidence_source_ids
 
 
 def _direct_backup_evidence(asset: dict) -> list[dict]:
@@ -562,7 +510,9 @@ def evaluate_report(
     restore_test_evidence: dict | None = None,
 ) -> dict:
     validate_policy(policy)
-    assets_by_id, evidence_source_ids = _validate_unified_report(report)
+    validated_report = validate_unified_report(report)
+    assets_by_id = validated_report["assets_by_id"]
+    evidence_source_ids = validated_report["evidence_source_ids"]
     validated_restore_test_evidence = (
         None
         if restore_test_evidence is None

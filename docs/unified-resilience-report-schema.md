@@ -19,6 +19,25 @@ The initial contract version is `1.0.0`. Producers should include
 `schema_version` in every report so that consumers can validate compatibility
 before processing evidence.
 
+## Executable Contract Validation
+
+The local `unified_report_validator` is the central executable validator for
+Unified Resilience Reports. The composer validates every input report and its
+finished output with this validator. The RPO/RTO evaluator validates its input
+Unified Report with the same implementation before evaluation.
+
+The validator enforces required report, evidence-source, asset, and finding
+fields; allowed evidence and overall statuses; unique non-empty identifiers;
+and strict UTC timestamps. `Z` and `+00:00` are accepted UTC representations.
+Invalid, offset-free, and non-UTC timestamps are rejected.
+
+Reference fields remain optional where the existing contract defines them as
+optional. When present, asset, finding, action, and nested evidence references
+must be non-empty and resolve to an evidence source, asset, or finding in the
+same report. Invalid reports are rejected without silent repair. This
+referential integrity is a prerequisite for later historical drift detection
+and deterministic cross-source risk scoring.
+
 ## Relationship to Current S3 Security Reports
 
 The AWS S3 security validator produces source-specific reports with structured
