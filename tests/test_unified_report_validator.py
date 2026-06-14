@@ -143,12 +143,69 @@ def test_non_string_statuses_are_rejected_with_value_error(location, field_path)
         validate_unified_report(report)
 
 
-def test_action_unknown_evidence_source_list_reference_is_rejected():
+@pytest.mark.parametrize(
+    ("field_name", "unknown_identifier"),
+    [
+        ("evidence_source_ids", "unknown-source"),
+        ("source_ids", "unknown-source"),
+        ("source_evidence_ids", "unknown-source"),
+        ("asset_ids", "unknown-asset"),
+        ("finding_ids", "unknown-finding"),
+    ],
+)
+def test_action_unknown_list_references_are_rejected(field_name, unknown_identifier):
     report = valid_report()
-    report["recommended_actions"][0]["evidence_source_ids"] = ["unknown-source"]
+    report["recommended_actions"][0]["parameters"] = {
+        field_name: [unknown_identifier]
+    }
 
     with pytest.raises(ValueError, match="references unknown identifier"):
         validate_unified_report(report)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["evidence_source_ids", "asset_ids", "finding_ids"],
+)
+def test_action_empty_reference_lists_are_rejected(field_name):
+    report = valid_report()
+    report["recommended_actions"][0]["parameters"] = {field_name: []}
+
+    with pytest.raises(ValueError, match=rf"parameters\.{field_name}.*non-empty list"):
+        validate_unified_report(report)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_identifier"),
+    [
+        ("asset_ids", "   "),
+        ("finding_ids", {}),
+    ],
+)
+def test_action_invalid_reference_list_items_are_rejected(
+    field_name,
+    invalid_identifier,
+):
+    report = valid_report()
+    report["recommended_actions"][0]["parameters"] = {
+        field_name: [invalid_identifier]
+    }
+
+    with pytest.raises(ValueError, match=rf"parameters\.{field_name}\[0\]"):
+        validate_unified_report(report)
+
+
+def test_action_valid_nested_reference_lists_are_accepted():
+    report = valid_report()
+    report["recommended_actions"][0]["parameters"] = {
+        "evidence_source_ids": ["source-validator"],
+        "source_ids": ["source-validator"],
+        "source_evidence_ids": ["source-validator"],
+        "asset_ids": ["asset-validator"],
+        "finding_ids": ["finding-validator"],
+    }
+
+    validate_unified_report(report)
 
 
 def test_action_nested_unknown_asset_reference_is_rejected():

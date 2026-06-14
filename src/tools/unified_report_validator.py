@@ -36,6 +36,10 @@ ACTION_REFERENCE_FIELDS = {
 }
 ACTION_REFERENCE_LIST_FIELDS = {
     "evidence_source_ids": "source",
+    "source_ids": "source",
+    "source_evidence_ids": "source",
+    "asset_ids": "asset",
+    "finding_ids": "finding",
 }
 KNOWN_ASSET_EVIDENCE_FIELDS = frozenset(
     {
@@ -225,9 +229,9 @@ def _validate_nested_action_references(
                 )
             list_reference_type = ACTION_REFERENCE_LIST_FIELDS.get(key)
             if list_reference_type is not None:
-                if not isinstance(nested_value, list):
+                if not isinstance(nested_value, list) or not nested_value:
                     raise ValueError(
-                        f"Unified report field '{nested_field}' must be a list."
+                        f"Unified report field '{nested_field}' must be a non-empty list."
                     )
                 for index, identifier in enumerate(nested_value):
                     _validate_reference(
