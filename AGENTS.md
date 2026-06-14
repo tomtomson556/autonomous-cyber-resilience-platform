@@ -50,7 +50,7 @@ Never include these in Git or ZIP backups:
 * `*.tfvars`
 * `.env`
 * secrets
-* reports
+* locally generated runtime reports under `reports/`
 * cache folders
 * `.agents/`
 * `.codex/`

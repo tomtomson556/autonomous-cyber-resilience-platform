@@ -51,7 +51,7 @@ Never include any of the following in repository changes or ZIP backups:
 * `*.tfvars`
 * `.terraform/`
 * Terraform provider binaries
-* reports
+* locally generated runtime reports under `reports/`
 * cache folders
 * `.agents/`
 * `.codex/`
