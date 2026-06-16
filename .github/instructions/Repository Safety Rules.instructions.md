@@ -59,6 +59,47 @@ Never include any of the following in repository changes or ZIP backups:
 
 AWS provider binaries must never be included in backups or commits.
 
+## Local safety preflight
+
+GitHub workspace agent files under `.github/agents/` must use no-space,
+lowercase kebab-case filenames ending in `.agent.md`, for example
+`pr-gatekeeper.agent.md`. Keep human-readable agent names inside the files.
+This convention is intentionally limited to `.github/agents/*.agent.md`; this
+instruction file keeps its existing filename.
+
+Use the local repository safety preflight for deterministic safety checks:
+
+```bash
+.venv/bin/python -m src.tools.repository_safety_preflight --mode default
+```
+
+Default mode validates tracked/versioned repository files and safe metadata,
+including `.github/agents/*.agent.md`. It is suitable for normal local
+development and must not fail only because ignored local artifacts such as
+`.venv/`, `.pytest_cache/`, `.ruff_cache/`, `__pycache__/`, `.terraform/`,
+provider binaries, or local Terraform state exist in the workspace.
+
+Use backup-scan mode only for supplied backup, ZIP-staging, or manifest paths:
+
+```bash
+.venv/bin/python -m src.tools.repository_safety_preflight --mode backup-scan --path <path>
+.venv/bin/python -m src.tools.repository_safety_preflight --mode backup-scan --path <root> --manifest <manifest>
+```
+
+Backup-scan mode checks path names for backup and ZIP blockers. It does not
+inspect ZIP contents. A manifest is a newline-delimited list of paths to check.
+The preflight checks paths and safe metadata only; it
+must not read Terraform state, real `.tfvars`, `.env`, provider binary, ZIP, or
+`.terraform/` file contents. It does not delete or clean anything, mutate the
+repository, run Terraform, call AWS or Azure, call Veeam, or replace human
+review.
+
+Agent metadata validation enforces this repository's intended local policy. It
+does not prove GitHub.com schema support or Copilot runtime enforcement.
+`disable-model-invocation` is an invocation or manual-selection control, not a
+no-model or no-LLM guarantee. `argument-hint` is advisory and must not be
+treated as an enforced GitHub.com security control.
+
 ## Validation expectations
 
 Use deterministic tests and strict validation for:
