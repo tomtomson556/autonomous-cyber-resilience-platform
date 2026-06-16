@@ -67,6 +67,47 @@ It is acceptable to include Terraform source files such as:
 
 It is not acceptable to include downloaded provider binaries such as `terraform-provider-aws`.
 
+## Repository safety preflight
+
+GitHub workspace agent files under `.github/agents/` use no-space,
+lowercase kebab-case filenames ending in `.agent.md`, for example
+`pr-gatekeeper.agent.md`. Human-readable agent names remain inside each file.
+The no-space filename convention applies to `.github/agents/*.agent.md`; this
+does not rename `.github/instructions/Repository Safety Rules.instructions.md`.
+
+Run the local repository safety preflight when changing repository safety
+configuration:
+
+```bash
+.venv/bin/python -m src.tools.repository_safety_preflight --mode default
+```
+
+Default mode validates tracked/versioned repository files and safe metadata,
+including `.github/agents/*.agent.md`. It is safe for normal local development
+and must not fail merely because ignored local artifacts such as `.venv/`,
+`.pytest_cache/`, `.ruff_cache/`, `__pycache__/`, `.terraform/`, provider
+binaries, or local Terraform state exist in the workspace.
+
+Backup-scan mode is for supplied backup, ZIP-staging, or manifest paths:
+
+```bash
+.venv/bin/python -m src.tools.repository_safety_preflight --mode backup-scan --path <path>
+.venv/bin/python -m src.tools.repository_safety_preflight --mode backup-scan --path <root> --manifest <manifest>
+```
+
+Backup-scan mode checks path names for artifacts that must not enter backups or
+ZIPs. A manifest is a newline-delimited list of paths to check. It does not
+inspect ZIP contents. The preflight checks paths and safe
+metadata only; it must not read Terraform state, real `.tfvars`, `.env`,
+provider binary, ZIP, or `.terraform/` file contents. It does not delete,
+clean, mutate, run Terraform, call AWS or Azure, call Veeam, replace human
+review, or prove GitHub Copilot runtime enforcement.
+
+`disable-model-invocation` in agent frontmatter is treated only as an
+invocation or manual-selection control for the repository's intended policy. It
+is not a no-model or no-LLM guarantee. `argument-hint` is advisory and must not
+be treated as an enforced GitHub.com security control.
+
 ## Python validation expectations
 
 For Python changes, prefer running:
