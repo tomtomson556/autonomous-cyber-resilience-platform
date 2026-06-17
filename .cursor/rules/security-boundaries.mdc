@@ -1,0 +1,33 @@
+---
+description: Security boundaries for autonomous-cyber-resilience-platform
+alwaysApply: true
+---
+
+This is a security-critical repository.
+
+Allowed:
+- Read and edit tracked source code, tests, documentation, and safe configuration files.
+- Prefer minimal, deterministic, reviewable changes.
+- Add or update local deterministic tests.
+- Run only safe validation commands:
+  - python -m src.tools.repository_safety_preflight --mode default
+  - pytest -q
+  - ruff check src tests
+  - python -m compileall -q src tests
+  - git status
+  - git diff
+  - git diff --check
+
+Forbidden:
+- Do not read, summarize, copy, transform, index, or include content from .env files, *.tfstate, *.tfstate.*, real *.tfvars, private keys, credentials, provider binaries, ZIP archives, or files under .terraform/.
+- Do not run terraform apply, terraform destroy, terraform import, terraform state, terraform init -migrate-state, backend migration commands, or infrastructure-changing Terraform commands.
+- Do not run AWS, Azure, Veeam, SSH production, restore, backup deletion, or infrastructure mutation commands.
+- Do not introduce productive Veeam HTTPS transport, restore execution, risk scoring, or infrastructure write behavior.
+- Do not create commits, push branches, open PRs, merge PRs, delete branches, rewrite history, or run cleanup/delete commands unless explicitly instructed by the human.
+- Do not access secrets, production credentials, real customer data, local Terraform state, or provider binaries.
+
+Workflow:
+- Explain intended scope before edits.
+- Keep changes inside the current branch.
+- After edits, show changed files and validation results.
+- If a requested task conflicts with these boundaries, stop and explain the conflict.

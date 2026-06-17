@@ -1,0 +1,43 @@
+# Secrets / credentials
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials*
+secrets*
+*_secret*
+*_token*
+
+# Terraform state / infrastructure artifacts
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+!**/*.tfvars.example
+**/.terraform/**
+.terraform/**
+**/terraform-provider-*
+
+# Local tool/auth/cache directories
+.git/**
+.venv/**
+.pytest_cache/**
+.ruff_cache/**
+.mypy_cache/**
+**/__pycache__/**
+.agents/**
+.codex/**
+.cursor/cache/**
+.cursor/tmp/**
+
+# Generated artifacts / reports / archives
+reports/**
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.log
+tmp/**
+temp/**
