@@ -234,14 +234,40 @@ __pycache__/
 # OS
 .DS_Store
 
-# Terraform
-.terraform/
+# Terraform local working directories
+**/.terraform/*
+
+# Terraform state files - never commit, read, copy, or archive
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
+
+# Terraform plan files - may contain sensitive values
+*.tfplan
+*.tfplan.json
+
+# Terraform variable files - may contain credentials or environment secrets
 *.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Terraform crash logs
 crash.log
 crash.*.log
+
+# Terraform local override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local Terraform CLI config
+.terraformrc
+terraform.rc
+
+# Keep provider dependency lock file tracked
+!.terraform.lock.hcl
 
 # Generated Reports
 reports/
