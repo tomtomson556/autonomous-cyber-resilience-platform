@@ -11,6 +11,6 @@ Pygments==2.20.0
 pytest==9.0.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
-ruff==0.15.16
+ruff==0.15.20
 s3transfer==0.18.0
 urllib3==2.7.0
